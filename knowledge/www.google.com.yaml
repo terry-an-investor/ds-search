@@ -1,0 +1,44 @@
+# Google Search (www.google.com)
+#
+# Key patterns discovered during exploration (2026-05-17):
+#
+# 1. Homepage (https://www.google.com)
+#    - Search input: textarea[name="q"] (also role="combobox")
+#    - Google Search button: role="button" name="Google Search"
+#    - I'm Feeling Lucky button: role="button" name="I'm Feeling Lucky"
+#    - AI Mode link: role="link" name="AI Mode"
+#    - Language links at bottom
+#    - Top nav: About, Store, Gmail, Images, Search Labs, Google apps, Account
+#
+# 2. Search results (https://www.google.com/search?q=<query>)
+#    - Results: h3 elements with titles, parent anchor for URLs
+#    - Snippets: textContent around h3 in result container
+#    - Result type indicators: "Web result with site links", "Web results"
+#    - Stats: #result-stats shows count and time
+#    - Pagination: #pnnext for next page
+#    - Search input: textarea[name="q"] still present for refinement
+#
+# 3. Search filters
+#    - Time filters: Any time, Past hour, Past 24 hours, Past week, Past month, Past year
+#    - Results type: All results, Verbatim
+#    - Tab navigation: #hdtb tabs (All, Images, Videos, News, Shopping, etc.)
+#
+# 4. Featured snippets / knowledge panels
+#    - Classes vary: .ifM9O, .EyBRub, .kp-wholepage
+#    - AI Overviews may appear above organic results
+#
+# 5. Pitfalls
+#    - Google's DOM classes are obfuscated and change frequently
+#    - h3 is the most reliable selector for result titles
+#    - fill on search input may fail; use evaluate to set value
+#    - Synthetic click on submit may not work; use form.submit() or navigate to /search?q=
+#    - Google may show CAPTCHA for automated access
+#    - Some results are "sitelinks" (sub-pages of a domain) with different structure
+#
+# 6. URL patterns
+#    - Search: /search?q=<query>
+#    - Time filter: &tbs=qdr:h (hour), d (day), w (week), m (month), y (year)
+#    - Pagination: &start=<n> (n=10, 20, 30...)
+#    - Verbatim: &tbs=li:1
+#    - Images: /search?tbm=isch&q=<query>
+#    - News: /search?tbm=nws&q=<query>

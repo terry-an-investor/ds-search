@@ -1,0 +1,91 @@
+# Knowledge gathered via: ds meta scan + interactive testing
+# Site: chat.deepseek.com (DeepSeek Chat)
+# Date: 2026-05-17
+
+site: chat.deepseek.com
+home_url: https://chat.deepseek.com
+
+# ── Input ──
+input:
+  selector: textarea
+  placeholder: "给 DeepSeek 发送消息"
+  method: key_type  # React controlled input — evaluate .value is overwritten
+  verify: "read textarea.value after typing, confirm length > 0"
+
+# ── Submit ──
+submit:
+  method: send_keys Enter  # OS-level keyboard, React processes it
+  native_setter: true  # send_message uses Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call()
+  wait_after_type_ms: 150
+  verify: "URL changes from / to /a/chat/s/<uuid>, message_count increases"
+
+# ── Interactive elements (discovered via ds meta scan) ──
+elements:
+  - text: 快速模式
+    role: radio
+    purpose: mode_switch
+    note: "checked=true when Quick mode active"
+
+  - text: 专家模式
+    role: radio
+    purpose: mode_switch
+    note: "checked=true when Expert mode active"
+
+  - text: 深度思考
+    role: button
+    purpose: toggle_thinking
+    note: "aria-checked=true when thinking ON. Click toggles."
+
+  - text: 智能搜索
+    role: button
+    purpose: toggle_search
+    note: "aria-checked=true when search ON. Click toggles."
+
+# ── Response ──
+response:
+  selector: .ds-markdown.ds-assistant-message-main-content
+  fallback: .ds-message (filter out user messages by hash-prefixed class)
+  thinking_selector: .ds-think-content within .ds-message
+  extract_order: scroll virtual list first, then query selectors latest-first
+
+# ── Loading indicators ──
+loading:
+  - .ds-loading
+  - "[aria-busy=true]"
+  - "[class*=spinner]"
+
+# ── Virtual list ──
+virtual_list:
+  selector: .ds-virtual-list
+  scroll_area: .ds-scroll-area
+  note: "Must scroll to bottom to trigger lazy rendering of messages"
+
+# ── Service errors ──
+errors:
+  rate_limit: "消息发送过于频繁，请稍后重试"
+  server_busy: "服务器繁忙，请稍后重试"
+  detection: "scan document.body.innerText for these strings"
+
+# ── SPA hydration ──
+hydration:
+  indicator: "textarea exists in DOM"
+  wait_max_sec: 15
+  poll_interval_ms: 500
+  note: "DeepSeek SPA loads fast (<2s usually), but virtual list may need extra settle time"
+  broken_state: "empty virtual list on /a/chat/s/ URL — close and reopen tab"
+
+# ── Timing parameters (from L3 bridge reference) ──
+timing:
+  poll_initial_ms: 100
+  poll_backoff: 1.3
+  poll_max_ms: 500
+  ready_timeout_sec: 15
+  stream_stable_polls: 4  # how many consecutive non-streaming polls to confirm finish
+  response_timeout_sec: 60
+
+# ── Known pitfalls ──
+pitfalls:
+  - "toggle_feature returns false even on success — fixed: click() returns undefined, don't use ?.click() ? 'true' : 'false'"
+  - "send_message uses native value setter — evaluate .value alone won't work on React"
+  - "Browser logging must be installed AFTER ensure_tab, not before"
+  - "Virtual list must be scrolled before extract, otherwise lazy-rendered messages are empty"

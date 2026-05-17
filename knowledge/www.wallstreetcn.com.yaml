@@ -1,0 +1,37 @@
+# WallstreetCN (wallstreetcn.com) — Financial news platform
+# Modeled: 2026-05-17 via ds meta scan/click
+# Type: financial news articles
+
+site: www.wallstreetcn.com
+type: financial_news
+
+# ── Homepage ──
+homepage:
+  url: "https://wallstreetcn.com/"
+  nav:
+    - 首页 (/)
+    - 资讯 (/news)
+    - 快讯 (/live)
+    - 行情 (/markets)
+    - 日历 (/calendar)
+    - VIP会员
+    - 大师课
+  input:
+    selector: "input[placeholder=搜索]"
+    method: key_type + Enter
+  article_links: "a[href*='/articles/']"
+  article_title: "h3, h2, [class*=title]"  # or link textContent
+  market_data: body text (e.g. "美元指数 99.27 +0.38")
+
+# ── Article Page ──
+article_page:
+  url_pattern: "https://wallstreetcn.com/articles/{id}"
+  title: document.title
+  body: ".article-body, .article-content, .rich-text" (likely)
+
+# ── Pitfalls ──
+pitfalls:
+  - "56 buttons detected but most are HTML5 video player controls (duplicated 4×)"
+  - "Spinners: [class*=spinner]×4 + [class*=loading]×5 — likely video player and lazy loading"
+  - "eval_js with 'return' fails (use IIFE)"
+  - "No dedicated article list on homepage — articles are mixed with market data"

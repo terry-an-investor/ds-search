@@ -1,0 +1,28 @@
+# Rust build artifacts
+target/
+
+# Knowledge scans cache
+knowledge/scans/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment / secrets
+.env
+.env.*
+
+# Logs
+*.log
+
+# Debug symbols
+*.pdb
+

@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["pilot", "deepseek", "grok", "gemini", "bilibili", "wallstreet", "weread", "google", "cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["zhaozhoubin"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }

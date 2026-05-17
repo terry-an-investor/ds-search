@@ -1,0 +1,104 @@
+# Knowledge gathered via: ds --session grok-model meta scan + interactive testing
+# Site: x.com/i/grok (Grok AI chat by xAI, embedded in X/Twitter)
+# Date: 2026-05-17
+
+site: x.com/i/grok
+home_url: https://x.com/i/grok
+
+# ── Input ──
+input:
+  selector: textarea
+  placeholder: "Ask anything"
+  method: key_type  # React controlled — evaluate .value is overwritten
+  verify: "read textarea.value after typing, confirm length > 0"
+  pitfall: "If previous send failed, stale text remains in textarea. Must clear (.value='') + dispatch input event before typing new message."
+
+# ── Submit ──
+submit:
+  method: send_keys Enter  # OS-level keyboard — works reliably
+  fallback: "click icon-only submit button (find button with no textContent, has child SVG)"
+  verify: "URL changes to include ?conversation=<id>, textarea is cleared, new message appears in body"
+
+# ── Interactive elements (discovered via ds meta scan) ──
+elements:
+  - text: Fast
+    role: button
+    purpose: model_selector
+    note: "Opens model dropdown (Fast/Deep/etc). aria-checked not set — check via textContent or class change."
+
+  - text: History
+    role: button
+    purpose: chat_history
+
+  - text: Private
+    role: button
+    purpose: privacy_toggle
+
+  - text: Create Images
+    role: button
+    purpose: image_generation
+
+  - text: Edit Image
+    role: button
+    purpose: image_editing
+
+  - text: Latest News
+    role: button
+    purpose: news_search
+
+  - text: See new posts
+    role: button
+    purpose: refresh_feed
+
+  - text: Copy share link
+    role: button
+    purpose: share_conversation
+    note: "Appears after conversation is created"
+
+  - text: Bookmark
+    role: button
+    purpose: bookmark_conversation
+    note: "Appears after conversation is created"
+
+  - text: New Chat
+    role: button
+    purpose: new_conversation
+    note: "Appears after conversation is created"
+
+# ── Response ──
+response:
+  extract_method: "Read document.body.innerText after streaming stops"
+  user_message_indicator: "Appears as plain text before Grok's response in body"
+  assistant_response_pattern: "Text after user message, before next interactive element (like Fast button)"
+  conversation_url_pattern: "?conversation=<numeric_id>"
+
+# ── Loading indicators ──
+loading:
+  - "Wait for textarea to be cleared after Enter"
+  - "Wait for new text to appear in body after user message"
+  - "No explicit spinner found in meta scan"
+
+# ── Initialization ──
+initialization:
+  pitfall: "May need to click 'Talk to Grok' banner (if present) to activate chat UI. This banner disappears after first interaction."
+  detect: "Check if 'Talk to Grok' appears in body text"
+
+# ── Session management ──
+session:
+  param: "--session grok-model"
+  note: "Must use separate session from deepseek to avoid tab conflicts"
+
+# ── Timing parameters ──
+timing:
+  wait_after_type_ms: 300
+  wait_after_enter_ms: 5000  # Grok can be slow to start responding
+  response_timeout_sec: 30
+
+# ── Known pitfalls ──
+pitfalls:
+  - "Stale text in textarea blocks send_keys Enter — must clear explicitly"
+  - "key_type + send_keys Enter works on first message but can fail on subsequent if textarea not focused"
+  - "send button (icon-only) click via evaluate works but may not trigger React handler — prefer send_keys"
+  - "Fast button click opens dropdown rather than toggling inline — need to handle model selection differently"
+  - "Unlike DeepSeek, no virtual list scrolling needed — responses appear inline in DOM"
+  - "No .ds-markdown selectors — response is plain text in body, harder to extract precisely"

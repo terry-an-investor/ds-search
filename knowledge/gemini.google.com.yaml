@@ -1,0 +1,85 @@
+# Knowledge gathered via: ds --session gemini meta scan + interactive testing
+# Site: gemini.google.com/app (Google Gemini)
+# Date: 2026-05-17
+
+site: gemini.google.com/app
+home_url: https://gemini.google.com/app
+
+# ── Input ──
+input:
+  selector: '[role="textbox"][contenteditable="true"]'
+  type: contenteditable_div
+  placeholder: "Enter a prompt for Gemini"
+  method: key_type  # Works on contenteditable DIVs
+  verify: "read element.textContent after typing, confirm length > 0"
+  pitfall: "No textarea element — Gemini uses contenteditable DIV. textarea.value will always be empty."
+
+# ── Submit ──
+submit:
+  method: send_keys Enter  # OS-level keyboard
+  verify: "URL changes to /app/<hash>, textbox is cleared, new .response-container appears"
+
+# ── Response ──
+response:
+  selector: .response-container
+  latest: "document.querySelectorAll('.response-container') — last element is latest response"
+  raw_format: "Show thinking\nGemini said\n<actual response>"
+  strip_prefix: "Remove 'Show thinking' and 'Gemini said' lines"
+  user_message_selector: ".conversation-container" (contains both user + assistant messages)
+
+# ── Model / Features ──
+models:
+  selector: .input-area-switch
+  options:
+    - text: Fast
+      description: Answers quickly
+      thinking: false
+    - text: Thinking
+      description: Solves complex problems
+      thinking: true
+    - text: Pro
+      description: Advanced math and code with 3.1 Pro
+      thinking: true
+  menu_panel: .gds-mode-switch-menu
+
+thinking:
+  container: .model-thoughts
+  content: .thoughts-content
+  expand_button: .thoughts-header-button
+  plan_title: "First line after expanding (e.g. 'Greeting Response Dev')"
+  extraction: "Click .thoughts-header-button, wait, read .thoughts-content textContent. Strip 'Show thinking' prefix."
+  note: "Thinking collapses after response completes. Must click to expand."
+  streaming: ".processing-state-visible class indicates ongoing streaming"
+
+tools:
+  selector: .leading-actions-wrapper
+  options:
+    - "Create image"
+    - "Create music"
+    - "Create video"
+    - "Help me learn"
+    - "Write anything"
+
+# ── Loading indicators ──
+loading:
+  pitfall: "Spinner (.ds-loading) is ALWAYS true even when page is ready. Don't use spinner as ready signal."
+  ready_signal: "Check if textbox ([role=textbox][contenteditable=true]) exists AND not disabled"
+
+# ── Session management ──
+session:
+  param: "--session gemini"
+
+# ── Timing ──
+timing:
+  wait_after_type_ms: 300
+  wait_after_enter_ms: 8000  # Gemini is slower than DeepSeek
+  response_timeout_sec: 30
+
+# ── Known pitfalls ──
+pitfalls:
+  - "No textarea — all inputs are contenteditable DIVs. Must check .textContent not .value"
+  - "Spinner is permanently true — useless as loading indicator"
+  - "Response text includes 'Show thinking' and 'Gemini said' prefixes — strip them"
+  - "key_type works on contenteditable without issues"
+  - "New conversation: textbox may need to be re-queried after navigation"
+  - "Response may appear in multiple .response-container elements — use last one"

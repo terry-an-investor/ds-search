@@ -1,0 +1,25 @@
+[package]
+name = "ds"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI for browser-automation via Kimi WebBridge"
+
+[[bin]]
+name = "ds"
+path = "src/main.rs"
+
+[dependencies]
+pilot = { path = "../pilot" }
+deepseek = { path = "../deepseek" }
+grok = { path = "../grok" }
+gemini = { path = "../gemini" }
+bilibili = { path = "../bilibili" }
+wallstreet = { path = "../wallstreet" }
+weread = { path = "../weread" }
+google = { path = "../google" }
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true

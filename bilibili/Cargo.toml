@@ -1,0 +1,12 @@
+[package]
+name = "bilibili"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Bilibili video platform adapter (search, extract, video details)"
+
+[dependencies]
+pilot = { path = "../pilot" }
+tokio.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

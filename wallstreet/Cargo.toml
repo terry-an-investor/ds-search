@@ -1,0 +1,12 @@
+[package]
+name = "wallstreet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WallstreetCN financial news platform adapter (articles + live newsfeed)"
+
+[dependencies]
+pilot = { path = "../pilot" }
+tokio.workspace = true
+serde_json.workspace = true
+tracing.workspace = true

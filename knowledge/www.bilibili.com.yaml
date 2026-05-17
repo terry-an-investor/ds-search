@@ -1,0 +1,95 @@
+# Bilibili (www.bilibili.com) — Video sharing platform
+# Modeled: 2026-05-17 via ds meta scan/click
+# Type: video search + video page, NOT AI chat
+
+site: www.bilibili.com
+type: video_platform
+
+# ── Search ──
+search:
+  url_pattern: "https://search.bilibili.com/all?keyword={keyword}"
+  pagination: "&page={n}"  # also supports &o={offset} (30 per page)
+  input:
+    selector: "input.nav-search-input"
+    placeholder: "输入关键字搜索"
+    method: key_type + Enter (or click 搜索 button)
+  submit:
+    primary: click button[type=submit] near input
+    fallback: navigate to search URL directly
+
+# ── Search Results Page ──
+results:
+  container: ".video.i_wrapper.search-all-list"
+  item: ".bili-video-card"
+  title: "[title]"  # or .bili-video-card__info--tit textContent
+  url: "a[href*='/video/']"
+  duration: "[class*=duration]"  # e.g. "23:04:56"
+  views: "textContent includes 万 or numbers after title"  # no stable class
+  uploader: "[class*=author]"  # e.g. "吴恩达机器学习_AndrewNg"
+  cover: "img"
+  note: "Some cards are ads (href contains 'cm.bilibili.com')"
+
+# ── Filter/Sort Buttons ──
+filters:
+  sort:
+    - 综合排序 (default)
+    - 最多播放
+    - 最新发布
+    - 最多弹幕
+    - 最多收藏
+  date:
+    - 全部日期 (default)
+    - 最近一天
+    - 最近一周
+    - 最近半年
+  duration:
+    - 全部时长 (default)
+    - 10分钟以下
+    - 10-30分钟
+    - 30-60分钟
+    - 60分钟以上
+
+# ── Pagination Buttons ──
+pagination_buttons:
+  - 上一页
+  - 1-34 (page numbers)
+  - 下一页
+
+# ── Video Page ──
+video_page:
+  url_pattern: "https://www.bilibili.com/video/{BVid}/"
+  title: document.title
+  stats:
+    views: body text (e.g. "354.0万")
+    likes: body text (e.g. "7.2万")
+    coins: body text
+    favorites: body text
+  uploader: text near 发消息 button
+  date: ISO date in body (e.g. "2025-01-04")
+  description: text after stats, before tags
+  tags: text links after description (e.g. "人工智能", "机器学习")
+  comments: scroll to load, class="reply-item"
+
+# ── Homepage ──
+homepage:
+  url: "https://www.bilibili.com/"
+  input: "input.nav-search-input" (placeholder varies, e.g. "deepseek接入solidworks")
+  elements:
+    - 换一换 (refresh trending)
+    - 顶部 (back to top)
+  content: video cards, live streams, trending topics
+
+# ── Pitfalls ──
+pitfalls:
+  - "eval_js with 'return' fails (use IIFE: (function(){...})())"
+  - "Search input on homepage uses different placeholder; search via URL is more reliable"
+  - "Video links open in new tab (target=_blank) — use direct navigate for same-tab testing"
+  - "[class*=spinner] matches 0; [class*=loading] matches 4 on video page (likely skeleton loaders)"
+  - "meta click '2' may match wrong element (views text contains '2'); use specific selectors for pagination"
+  - "Ads appear in search results with cm.bilibili.com tracking URLs — filter them out"
+
+# ── JS Patterns that Work ──
+js_patterns:
+  focus_input: "(function(){var i=document.querySelector('input:not([type=hidden])');i.focus()})()"
+  click_submit: "(function(){var b=document.querySelectorAll('button[type=submit]');b[0].click()})()"
+  extract_videos: "Array.from(document.querySelectorAll('.video.i_wrapper .bili-video-card'))"

@@ -1,0 +1,71 @@
+# WallstreetCN Live/Global (wallstreetcn.com/live/global) — Real-time financial newsfeed
+# Modeled: 2026-05-17 via ds meta scan/click
+# Type: live newsfeed with categories and filters
+
+site: wallstreetcn.com/live/global
+type: live_newsfeed
+
+# ── Page Structure ──
+page:
+  url: "https://wallstreetcn.com/live/global"
+  container: ".livenews-wrapper"
+  layout:
+    columns_left: ".columns-left"       # nav tabs + feed
+    columns_right: ".responsive"         # sidebar (likely filters/ads)
+  header_time: "date and time string at top, e.g. '05月17日， 星期日， 21:18:51'"
+
+# ── Category Tabs ──
+categories:
+  container: ".nav-main"
+  item: ".nav-item"
+  active: ".nav-item.active"
+  list:
+    - 要闻 (default, global news)
+    - A股
+    - 美股
+    - 港股
+    - 外汇
+    - 商品
+    - 债券
+    - 科技
+  note: "Click .nav-item to switch. Check .active for current."
+
+# ── News Items ──
+feed:
+  container: ".livenews-main"
+  item: ".live-item"
+  structure:
+    time: "HH:MM at start of textContent (e.g. '21:17 ')"
+    title: "【...】 bracket-wrapped title"
+    content: "remaining text after 】"
+    actions: "参与评论 收藏 微信 微博 (in last child)"
+  extraction:
+    text_content: "item.textContent.trim()"  # e.g. "21:17 【title】content..."
+    time_regex: "/^(\\d{2}:\\d{2})\\s/"
+    title_regex: "/【(.+?)】/"
+
+# ── Settings / Filters ──
+settings:
+  container: ".live-settings"
+  options:
+    - "设置" (settings button)
+    - "只看重要的" (important-only toggle)
+    - "日期" (date picker)
+    - "声音提醒"
+    - "桌面提示"
+    - "语音播报"
+
+# ── Initialization ──
+init:
+  - Navigate to https://wallstreetcn.com/live/global
+  - Wait for .live-item to appear (polls every 500ms, max 30 tries)
+  - Page auto-loads latest items; no manual send required
+
+# ── Pitfalls ──
+pitfalls:
+  - "eval_js with 'return' fails (use IIFE)"
+  - "Category tabs are DIV.nav-item, not A links — use click(), not href navigation"
+  - "Items auto-update in real-time (WebSocket); polling textContent for changes works"
+  - "7 inputs detected but 5 are hidden/empty (likely filter widgets)"
+  - "No labeled buttons on live page (all icon-only)"
+  - "Time element is NOT a separate DOM element — parsed from textContent"
