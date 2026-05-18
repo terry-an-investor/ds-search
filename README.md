@@ -25,7 +25,7 @@ cargo run -- meta scan
 | Command | Site | Capabilities |
 |---------|------|-------------|
 | `deepseek` | chat.deepseek.com | Send prompts, extract responses/thinking, toggle search/thinking mode, new conversations |
-| `grok` | grok.com | Send prompts, extract responses, new conversations |
+| `grok` | x.com/i/grok | Send prompts, extract responses, new conversations |
 | `gemini` | gemini.google.com | Send prompts, extract responses/thinking, select model (Fast/Thinking/Pro), stream detection |
 | `bilibili` | bilibili.com | Search videos, extract results (title/duration/uploader), pagination, sort, video details |
 | `wallstreet` | wallstreetcn.com | Extract articles, search, article body extraction |
