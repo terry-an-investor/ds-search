@@ -2,6 +2,8 @@
 
 Multi-adapter browser automation CLI for interacting with web AI platforms and search engines via [Kimi WebBridge](https://kimi.com/features/webbridge).
 
+> **⚠️ Research only. Do not abuse.** This tool drives a real browser with your real login sessions. Rate-limiting, CAPTCHAs, account bans, and legal consequences may apply. Use responsibly and respect each platform's terms of service.
+
 ## Prerequisites
 
 - [Kimi WebBridge](https://kimi.com/features/webbridge) browser extension installed and running at `http://127.0.0.1:10086`
