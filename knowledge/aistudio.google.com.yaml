@@ -1,0 +1,87 @@
+# Google AI Studio (aistudio.google.com)
+#
+# Key patterns discovered during exploration (2026-05-18):
+#
+# 1. Pages / Views
+#    - Playground: /prompts/new_chat — main chat interface with model
+#    - History/Library: /library — list of past prompts
+#    - Build: /apps — apps management
+#    - Apps (user): /apps?source=user — user-created apps
+#    - Gallery: /apps?source=showcase — public showcase
+#    - Dashboard: /api-keys — API keys and usage stats
+#    - Documentation: https://ai.google.dev/gemini-api/docs (external link)
+#
+# 2. Playground elements
+#    - Prompt input: textarea (placeholder="Start typing a prompt to see what our models can do")
+#    - Run button: button containing "Run" text — triggers GenerateContent
+#    - Model selector: button.model-selector-card — opens model selection dialog
+#    - System instructions: textarea for optional tone/style instructions
+#    - Temperature: slider control
+#    - Thinking level: mat-select combobox (Low/Medium/High)
+#    - Tools toggles: Structured outputs, Code execution, Function calling,
+#      Grounding with Google Search, Grounding with Google Maps, URL context
+#    - Get code button: "Get code" — shows API code snippet for current prompt
+#    - Chat turns: .chat-turn-container.user and .chat-turn-container.model
+#    - Response feedback: thumb_up / thumb_down buttons
+#    - Response time: .model-run-time-pill (e.g., "3.9s")
+#
+# 3. Model selection dialog (triggered by .model-selector-card)
+#    - Search bar at top
+#    - Category tabs: All, Featured, Gemini, Live, Images, Video, Audio, Music, Agents, Gemma
+#    - Model cards: .content-button or .model-options-container > button
+#    - Each model shows: model-title, model-subtitle (ID), pricing, capabilities
+#
+#     Available models (as of 2026-05-18):
+#    ┌──────────────────────────────────────────────────────────────┐
+#    │ ID                              │ Name                     │
+#    ├──────────────────────────────────────────────────────────────┤
+#    │ gemini-3.1-flash-lite           │ Gemini 3.1 Flash Lite    │
+#    │ gemini-3-flash-preview          │ Gemini 3 Flash Preview   │
+#    │ gemini-3.1-pro-preview          │ Gemini 3.1 Pro Preview   │
+#    │ gemini-3.1-flash-image-preview  │ Nano Banana 2 (Image)    │
+#    │ gemini-3-pro-image-preview      │ Nano Banana Pro (Image)  │
+#    │ gemini-pro-latest               │ Gemini Pro Latest (alias)│
+#    │ gemini-flash-latest             │ Gemini Flash Latest      │
+#    │ gemini-flash-lite-latest        │ Gemini Flash-Lite Latest │
+#    └──────────────────────────────────────────────────────────────┘
+#
+# 4. API endpoints (alkalimakersuite-pa.clients6.google.com)
+#    All use Google's RPC framework, mimeType: application/json+protobuf
+#
+#    - CreatePrompt:   POST /$rpc/...MakerSuiteService/CreatePrompt
+#    - ListPrompts:    POST /$rpc/...MakerSuiteService/ListPrompts
+#    - GenerateContent: POST /$rpc/...MakerSuiteService/GenerateContent
+#    - CountTokens:    POST /$rpc/...MakerSuiteService/CountTokens
+#    - GenerateTitle:  POST /$rpc/...MakerSuiteService/GenerateTitle
+#
+# 5. Response rendering
+#    - Angular virtual scroll: .virtual-scroll-container with .turn-content (initially empty)
+#    - Response text rendered via Angular components, visible in body.innerText
+#    - After response: H1 title updates to a generated title (e.g., "Hello, World!")
+#    - Extraction: use document.body.innerText, look for text between user prompt and footer
+#
+# 6. History page (/library)
+#    - Tabs: All | My files | Shared | drive
+#    - Search bar for filtering prompts
+#    - Table columns: Name, Updated
+#    - Each row: type icon (chat_bubble), title, "Created by you", timestamp, more_vert
+#    - Clicking a row opens that prompt in the playground
+#
+# 7. Pitfalls
+#    - fill on textarea may fail (Angular form controls); use nativeSetter + dispatchEvent
+#    - Response content NOT in .turn-content innerHTML (rendered via Angular component)
+#      Extract from document.body.innerText instead
+#    - Model selection requires opening dialog, finding model card, clicking it
+#    - The page auto-navigates to /prompts/new_chat on initial load
+#    - API uses protobuf encoding (not JSON) — browser handles this transparently
+#    - Synthetic click on Run button works (confirmed 2026-05-18)
+#    - New Chat button (aria-label="New chat") may reset the page
+#    - Navigating back to /prompts/new_chat creates a fresh session
+#
+# 8. URL patterns
+#    - Playground: /prompts/new_chat
+#    - Specific prompt: /prompts/<prompt_id> (after creating first turn)
+#    - History: /library
+#    - Apps: /apps?source=user
+#    - Gallery: /apps?source=showcase
+#    - Dashboard: /api-keys

@@ -172,6 +172,7 @@ dependencies = [
  "deepseek",
  "gemini",
  "google",
+ "google-aistudio",
  "grok",
  "pilot",
  "reqwest",
@@ -348,6 +349,16 @@ dependencies = [
 
 [[package]]
 name = "google"
+version = "0.1.0"
+dependencies = [
+ "pilot",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "google-aistudio"
 version = "0.1.0"
 dependencies = [
  "pilot",

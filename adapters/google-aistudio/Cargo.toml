@@ -1,0 +1,12 @@
+[package]
+name = "google-aistudio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Google AI Studio (aistudio.google.com) adapter — prompt models, manage history"
+
+[dependencies]
+pilot = { path = "../../pilot" }
+tokio.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
