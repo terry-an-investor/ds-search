@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["pilot", "deepseek", "grok", "gemini", "bilibili", "wallstreet", "weread", "google", "cli"]
+members = ["pilot", "adapters/deepseek", "adapters/grok", "adapters/gemini", "adapters/bilibili", "adapters/wallstreet", "adapters/weread", "adapters/google", "cli"]
 
 [workspace.package]
 version = "0.1.0"

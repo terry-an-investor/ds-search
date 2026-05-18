@@ -1,12 +1,12 @@
 [package]
-name = "wallstreet"
+name = "bilibili"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "WallstreetCN financial news platform adapter (articles + live newsfeed)"
+description = "Bilibili video platform adapter (search, extract, video details)"
 
 [dependencies]
-pilot = { path = "../pilot" }
+pilot = { path = "../../pilot" }
 tokio.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

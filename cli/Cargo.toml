@@ -11,13 +11,13 @@ path = "src/main.rs"
 
 [dependencies]
 pilot = { path = "../pilot" }
-deepseek = { path = "../deepseek" }
-grok = { path = "../grok" }
-gemini = { path = "../gemini" }
-bilibili = { path = "../bilibili" }
-wallstreet = { path = "../wallstreet" }
-weread = { path = "../weread" }
-google = { path = "../google" }
+deepseek = { path = "../adapters/deepseek" }
+grok = { path = "../adapters/grok" }
+gemini = { path = "../adapters/gemini" }
+bilibili = { path = "../adapters/bilibili" }
+wallstreet = { path = "../adapters/wallstreet" }
+weread = { path = "../adapters/weread" }
+google = { path = "../adapters/google" }
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
