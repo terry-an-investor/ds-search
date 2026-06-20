@@ -1,0 +1,73 @@
+# X.com (Twitter) — Social media platform
+# Modeled: 2026-05-28 via kimi-webbridge
+# Type: tweet thread extraction
+
+site: x.com
+type: social_media
+
+# ── Tweet Page ──
+tweet_page:
+  url_pattern: "https://x.com/{username}/status/{tweet_id}"
+  article_selector: "article"
+  
+  # Main tweet structure
+  main_tweet:
+    container: "article" (first article on page)
+    author: "a[href*='/{username}']" (link with username)
+    text: "[data-testid='tweetText']" or first StaticText after author
+    timestamp: "time" element
+    stats:
+      replies: "button[name='reply']" parent text
+      reposts: "button[name='retweet']" parent text  
+      likes: "button[name='like']" parent text
+      views: "a[href*='/analytics']" text
+
+  # Thread replies (self-replies by same author)
+  thread_replies:
+    container: "article" (subsequent articles)
+    filter: author link href contains same username
+    text: "[data-testid='tweetText']"
+    links: "a[href]" within tweet text
+    cards: "[data-testid='card.wrapper']" for link previews
+    
+  # Link extraction
+  links:
+    external: "a[href*='t.co']" or "a[href]" not containing x.com
+    card_wrapper: "[data-testid='card.wrapper']"
+    card_url: "a[href]" within card wrapper
+    card_title: "[data-testid='card.wrapper'] [data-testid='card.layoutSmall.detail']" text
+
+# ── DOM Structure ──
+dom:
+  tweet_container: "article"
+  tweet_text: "[data-testid='tweetText']"
+  user_link: "a[href*='/']" (first link with username)
+  timestamp: "time"
+  reply_button: "[data-testid='reply']"
+  retweet_button: "[data-testid='retweet']"
+  like_button: "[data-testid='like']"
+  bookmark_button: "[data-testid='bookmark']"
+  analytics_link: "a[href*='/analytics']"
+  
+  # For threads
+  thread_indicator: "a[href*='/status/']" (links to other tweets in thread)
+  show_more_replies: "button" with text "Show more replies"
+
+# ── Pitfalls ──
+pitfalls:
+  - "Tweet text may be truncated in article.innerText - use [data-testid='tweetText'] for full text"
+  - "Thread replies don't auto-load - need to scroll down to trigger lazy loading"
+  - "External links use t.co redirects - need to follow redirect or extract from card wrapper"
+  - "Card wrappers (link previews) contain the actual URL in nested <a> tags"
+  - "Self-replies (thread) have same author - filter by username in href"
+  - "Scrolling too fast may not load all replies - use 500-1000ms delays"
+  - "Tweet stats use aria-label like '23 Replies. Reply' - parse number from text"
+
+# ── JS Patterns ──
+js_patterns:
+  get_all_articles: "document.querySelectorAll('article')"
+  get_tweet_text: "article.querySelector('[data-testid=\"tweetText\"]')?.innerText"
+  get_author: "article.querySelector('a[href*=\"/\"]')?.getAttribute('href')"
+  get_external_links: "Array.from(article.querySelectorAll('a[href]')).filter(a => !a.href.includes('x.com') && !a.href.includes('twitter.com'))"
+  get_card_links: "Array.from(article.querySelectorAll('[data-testid=\"card.wrapper\"] a[href]'))"
+  scroll_to_load: "window.scrollBy(0, 500)"

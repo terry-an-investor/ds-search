@@ -10,5 +10,5 @@ pub mod models;
 
 pub use error::{AdapterError, Result};
 pub use kimi::KimiPrimitives;
-pub use logging::init_logging;
+pub use logging::{init_logging, log_browser_entries};
 pub use models::BrowserLogEntry;

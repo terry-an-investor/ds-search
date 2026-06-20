@@ -19,6 +19,7 @@ wallstreet = { path = "../adapters/wallstreet" }
 weread = { path = "../adapters/weread" }
 google = { path = "../adapters/google" }
 google-aistudio = { path = "../adapters/google-aistudio" }
+x = { path = "../adapters/x" }
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

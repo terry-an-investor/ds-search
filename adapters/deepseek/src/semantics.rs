@@ -7,7 +7,7 @@ use crate::models::{BrowserLogEntry, ChatMode, FastState, Feature};
 use pilot::error::{AdapterError, Result};
 use pilot::kimi::KimiPrimitives;
 use std::time::Duration;
-use tracing::debug;
+use tracing::{debug, info, warn};
 
 /// DeepSeek-specific page operations.
 #[derive(Debug, Clone)]
@@ -482,6 +482,92 @@ impl DeepSeekSemantics {
         } else {
             Some(text)
         }
+    }
+
+    // ── Full send pipeline (stability-confirmed) ──
+
+    /// Wait until the page stops streaming. Polls `is_streaming` until false,
+    /// then re-checks after a short cooldown to filter out momentary pauses.
+    async fn wait_for_response(&self, timeout: Duration) -> bool {
+        let deadline = tokio::time::Instant::now() + timeout;
+        let mut interval = 0.1;
+
+        while tokio::time::Instant::now() < deadline {
+            self.scroll_virtual_list().await;
+            let st = self.get_fast_state().await;
+            if !st.is_streaming {
+                // Cooldown: streaming may pause briefly mid-generation
+                tokio::time::sleep(Duration::from_millis(800)).await;
+                if !self.get_fast_state().await.is_streaming {
+                    debug!("streaming finished");
+                    return true;
+                }
+            }
+            tokio::time::sleep(Duration::from_secs_f64(interval)).await;
+            interval = (interval * 1.3).min(0.5);
+        }
+
+        warn!("wait_for_response timeout");
+        false
+    }
+
+    /// Full send pipeline: send → wait for streaming to settle → extract with
+    /// stability confirmation. This is the production-grade send path for
+    /// DeepSeek's virtual-list + streaming-render combination, which the bare
+    /// `send_message` does not handle.
+    ///
+    /// - Captures a baseline so we never return a stale/duplicate response.
+    /// - Fast-fails on service errors (rate limit / server busy) without
+    ///   wasting the retry budget.
+    /// - Confirms content is stable across two reads before returning.
+    pub async fn send_and_wait(&self, msg: &str) -> Result<String> {
+        self.ensure_tab().await?;
+
+        // Capture baseline content (to reject stale/duplicate extraction)
+        let baseline = self.extract_last_response().await;
+
+        self.send_message(msg).await?;
+
+        if !self.wait_for_response(Duration::from_secs(60)).await {
+            return Err(AdapterError::NoResponse);
+        }
+
+        // Fast-fail: if the page already shows a service error, don't retry
+        if let Some(err) = self.check_service_error().await {
+            warn!(error = %err, "service error after streaming stopped");
+            return Err(AdapterError::NoResponse);
+        }
+
+        // Extract with backoff + duplicate guard + stability check
+        let mut retry_interval = 0.2_f64;
+        for i in 0..20 {
+            if let Some(err) = self.check_service_error().await {
+                warn!(error = %err, "service error detected, aborting extract");
+                return Err(AdapterError::NoResponse);
+            }
+
+            tokio::time::sleep(Duration::from_secs_f64(retry_interval)).await;
+            self.scroll_virtual_list().await;
+            tokio::time::sleep(Duration::from_millis(300)).await;
+
+            let content = self.extract_last_response().await;
+            if !content.is_empty() && content != baseline {
+                // Stability: re-read after cooldown, must match
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                self.scroll_virtual_list().await;
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                let confirm = self.extract_last_response().await;
+                if confirm == content {
+                    info!(len = content.len(), retry = i, "send_and_wait ok");
+                    return Ok(content);
+                }
+                debug!(retry = i, "content unstable, retrying");
+            }
+            retry_interval = (retry_interval * 1.5).min(2.0);
+        }
+
+        warn!("no stable response after 20 fallbacks");
+        Err(AdapterError::NoResponse)
     }
 
 }

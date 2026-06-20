@@ -1,9 +1,10 @@
-//! Integration tests for ds-adapter using a mock Kimi WebBridge server.
+//! Integration tests for the DeepSeek adapter using a mock Kimi WebBridge server.
 
 mod mock_server;
 
-use ds_adapter::{ChatMode, DeepSeekAgentBridge, Feature, KimiPrimitives};
+use deepseek::{ChatMode, DeepSeekSemantics, Feature};
 use mock_server::{MockKimi, browser_log_json, extract_response_json, fast_state_json};
+use pilot::KimiPrimitives;
 
 // ── Layer 1: KimiPrimitives ──
 
@@ -84,7 +85,7 @@ async fn find_tab_found() {
 async fn get_fast_state_ok() {
     let m = MockKimi::new().await;
     m.set_eval_response("has_input", fast_state_json(true, false, 5, "https://chat.deepseek.com", true));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let st = s.get_fast_state().await;
     assert!(st.has_input);
     assert!(!st.is_streaming);
@@ -95,7 +96,7 @@ async fn get_fast_state_ok() {
 #[tokio::test]
 async fn get_fast_state_defaults() {
     let m = MockKimi::new().await;
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let st = s.get_fast_state().await;
     assert!(!st.has_input);
     assert_eq!(st.message_count, 0);
@@ -104,7 +105,7 @@ async fn get_fast_state_defaults() {
 #[tokio::test]
 async fn send_message_empty_err() {
     let m = MockKimi::new().await;
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let r = s.send_message("").await;
     assert!(r.unwrap_err().to_string().contains("empty"));
 }
@@ -113,7 +114,7 @@ async fn send_message_empty_err() {
 async fn send_message_no_textarea_err() {
     let m = MockKimi::new().await;
     m.set_eval_response("no-ta", serde_json::json!("no-ta"));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let r = s.send_message("hello").await;
     assert!(r.unwrap_err().to_string().contains("textarea"));
 }
@@ -122,7 +123,7 @@ async fn send_message_no_textarea_err() {
 async fn select_mode_ok() {
     let m = MockKimi::new().await;
     m.set_eval_response("role", serde_json::json!("true"));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     assert!(s.select_mode(ChatMode::Expert).await);
 }
 
@@ -130,7 +131,7 @@ async fn select_mode_ok() {
 async fn select_mode_fails() {
     let m = MockKimi::new().await;
     m.set_eval_response("role", serde_json::json!("false"));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     assert!(!s.select_mode(ChatMode::Expert).await);
 }
 
@@ -138,7 +139,7 @@ async fn select_mode_fails() {
 async fn toggle_feature_ok() {
     let m = MockKimi::new().await;
     m.set_eval_response("思考", serde_json::json!("true"));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     assert!(s.toggle_feature(Feature::Thinking).await);
 }
 
@@ -146,7 +147,7 @@ async fn toggle_feature_ok() {
 async fn extract_last_response_ok() {
     let m = MockKimi::new().await;
     m.set_eval_response("ds-markdown", extract_response_json(true, "Hello!"));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     assert_eq!(s.extract_last_response().await, "Hello!");
 }
 
@@ -154,7 +155,7 @@ async fn extract_last_response_ok() {
 async fn extract_last_response_empty() {
     let m = MockKimi::new().await;
     m.set_eval_response("ds-markdown", extract_response_json(false, ""));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     assert_eq!(s.extract_last_response().await, "");
 }
 
@@ -165,29 +166,11 @@ async fn get_browser_log_ok() {
         serde_json::json!({"lvl": "log", "t": 1000, "m": "test"}),
         serde_json::json!({"lvl": "fetch", "t": 1100, "m": "https://api.example.com"}),
     ]));
-    let s = ds_adapter::DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let log = s.get_browser_log(false).await;
     assert_eq!(log.len(), 2);
     assert_eq!(log[0].lvl, "log");
     assert_eq!(log[1].lvl, "fetch");
-}
-
-// ── Layer 3: Bridge (level tests avoided — prefer individual component tests above) ──
-
-#[tokio::test]
-async fn bridge_wait_until_ready() {
-    let m = MockKimi::new().await;
-    m.set_eval_response("has_input", fast_state_json(true, false, 0, "https://chat.deepseek.com", false));
-    let b = DeepSeekAgentBridge::new(KimiPrimitives::new(m.server.uri(), "t"));
-    assert!(b.wait_until_ready(std::time::Duration::from_secs(5)).await);
-}
-
-#[tokio::test]
-async fn bridge_wait_until_ready_timeout() {
-    let m = MockKimi::new().await;
-    m.set_eval_response("has_input", fast_state_json(true, true, 0, "https://chat.deepseek.com", false));
-    let b = DeepSeekAgentBridge::new(KimiPrimitives::new(m.server.uri(), "t"));
-    assert!(!b.wait_until_ready(std::time::Duration::from_millis(500)).await);
 }
 
 // ── Models ──
@@ -206,7 +189,7 @@ async fn feature_labels() {
 
 #[tokio::test]
 async fn fast_state_default() {
-    let st = ds_adapter::FastState::default();
+    let st = deepseek::FastState::default();
     assert!(!st.has_input);
     assert_eq!(st.message_count, 0);
 }
