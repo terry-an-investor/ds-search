@@ -1,0 +1,86 @@
+{
+  "buttons": [
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "History"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Private"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "See new posts"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Fast"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Create Images"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Edit Image"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Latest News"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Customize GrokGet access to more features on grok.comExplore"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Explore"
+    }
+  ],
+  "inputs": [
+    {
+      "disabled": false,
+      "placeholder": "Ask anything",
+      "tag": "TEXTAREA",
+      "type": "textarea"
+    },
+    {
+      "disabled": false,
+      "placeholder": "",
+      "tag": "INPUT",
+      "type": "file"
+    },
+    {
+      "disabled": false,
+      "placeholder": "",
+      "tag": "INPUT",
+      "type": "file"
+    },
+    {
+      "disabled": false,
+      "placeholder": "",
+      "tag": "TEXTAREA",
+      "type": "textarea"
+    }
+  ],
+  "title": "",
+  "url": "https://x.com/i/grok"
+}

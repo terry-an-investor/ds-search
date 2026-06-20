@@ -1,0 +1,278 @@
+{
+  "buttons": [
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Skip to main content"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "expand_more"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "info"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "notifications"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "settings"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "search"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "key"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "menu"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "share"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "compare_arrows"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "add"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "more_vert"
+    },
+    {
+      "checked": "true",
+      "disabled": false,
+      "role": "radio",
+      "text": "Models"
+    },
+    {
+      "checked": "false",
+      "disabled": false,
+      "role": "radio",
+      "text": "Agents"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "antigravity Antigravity PreviewA general-purpose autonomous "
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "radio AI Talk RadioTransforms a text source into a polished,"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "support_agent Customer SupportScans a website to build a cus"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "query_stats Data AnalystDelivers interactive business intell"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "description Document ProcessorReconciles expenses and invoic"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "build Repo MaintainerAnalyzes your codebase to identify issu"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "star FeaturedTest out our most advanced and newest models."
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "chat_bubble Code and ChatBuild chatbots, agents, and code wi"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "image Image GenerationCreate and edit images with Nano Banan"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "movie Video GenerationGenerate videos with Veo models, our s"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "mic Speech and MusicExplore our text to speech and music gen"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "bolt Real-timeReal-time voice and video with Live API."
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "key_off"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "widgets Tools"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "chevron_left"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "google Grounding with Google Search"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "close"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "chevron_right"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "mic"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "add_circle"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Run keyboard_command_key keyboard_return"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "code Get code"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "reset_settings"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "close"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Gemini 3.5 Flashgemini-3.5-flashOur most intelligent model f"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "System instructionsOptional tone and style instructions for "
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "expand_more"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Edit"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Edit"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "expand_more"
+    }
+  ],
+  "inputs": [
+    {
+      "disabled": false,
+      "placeholder": "Start typing a prompt to see what our models can do",
+      "tag": "TEXTAREA",
+      "type": "textarea"
+    }
+  ],
+  "title": "Google AI Studio",
+  "url": "https://aistudio.google.com/prompts/new_chat"
+}

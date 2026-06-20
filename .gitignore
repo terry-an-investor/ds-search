@@ -1,8 +1,11 @@
 # Rust build artifacts
 target/
 
-# Knowledge scans cache
-knowledge/scans/
+# Knowledge scans: ignore all local snapshots (debug, ad-hoc tests)
+# but KEEP structural baselines (*-baseline.json) generated via
+# `meta save-structure` — those are version-safe regression references.
+knowledge/scans/*
+!knowledge/scans/*-baseline.json
 
 # macOS
 .DS_Store

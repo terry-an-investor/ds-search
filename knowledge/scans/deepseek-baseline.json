@@ -1,0 +1,35 @@
+{
+  "buttons": [
+    {
+      "checked": "true",
+      "role": "radio",
+      "text": "快速模式快速模式"
+    },
+    {
+      "checked": "false",
+      "role": "radio",
+      "text": "专家模式专家模式"
+    },
+    {
+      "checked": "false",
+      "role": "radio",
+      "text": "识图模式识图模式"
+    }
+  ],
+  "inputs": [
+    {
+      "disabled": false,
+      "placeholder": "给 DeepSeek 发送消息 ",
+      "tag": "TEXTAREA",
+      "type": "textarea"
+    },
+    {
+      "disabled": false,
+      "placeholder": "",
+      "tag": "INPUT",
+      "type": "file"
+    }
+  ],
+  "title": "DeepSeek",
+  "url": "https://chat.deepseek.com/"
+}

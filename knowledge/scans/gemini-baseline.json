@@ -1,0 +1,36 @@
+{
+  "buttons": [
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Notebooks"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Recents"
+    },
+    {
+      "checked": "",
+      "disabled": false,
+      "role": "button",
+      "text": "Flash"
+    }
+  ],
+  "inputs": [
+    {
+      "placeholder": "",
+      "tag": "DIV",
+      "type": ""
+    },
+    {
+      "placeholder": "",
+      "tag": "DIV",
+      "type": ""
+    }
+  ],
+  "title": "Google Gemini",
+  "url": "https://gemini.google.com/app"
+}
