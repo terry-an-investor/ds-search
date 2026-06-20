@@ -8,9 +8,14 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
     let gem = GeminiSemantics::new(kimi(&session));
 
     Ok(match sub {
-        "ensure" => { gem.ensure_tab().await?; "ok".into() }
+        "ensure" => {
+            gem.ensure_tab().await?;
+            "ok".into()
+        }
         "send" => {
-            if sub_arg.is_empty() { return Err("send requires text".into()); }
+            if sub_arg.is_empty() {
+                return Err("send requires text".into());
+            }
             gem.ensure_tab().await?;
             gem.send_message(sub_arg).await?;
             "dispatched".into()
@@ -19,7 +24,10 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
             let r = gem.extract_last_response().await;
             if r.is_empty() { "(empty)".into() } else { r }
         }
-        "thinking" => gem.extract_thinking().await.unwrap_or_else(|| "(none)".into()),
+        "thinking" => gem
+            .extract_thinking()
+            .await
+            .unwrap_or_else(|| "(none)".into()),
         "stream" => gem.get_streaming_state().await,
         "wait" => format!("response_ready: {}", gem.wait_for_response(30).await),
         "model" => {
@@ -32,7 +40,10 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
             gem.select_model(m).await?;
             format!("model → {}", sub_arg)
         }
-        "new" => { gem.new_conversation().await?; "ok".into() }
+        "new" => {
+            gem.new_conversation().await?;
+            "ok".into()
+        }
         _ => return Err("subcommands: ensure send extract thinking stream wait model new".into()),
     })
 }

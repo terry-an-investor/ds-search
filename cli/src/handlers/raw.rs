@@ -8,19 +8,28 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
 
     Ok(match sub {
         "eval" => {
-            if sub_arg.is_empty() { return Err("raw eval requires JS code".into()); }
+            if sub_arg.is_empty() {
+                return Err("raw eval requires JS code".into());
+            }
             let (v, _) = k.eval_js(sub_arg).await;
             v
         }
         "key" => {
-            if sub_arg.is_empty() { return Err("raw key requires text".into()); }
+            if sub_arg.is_empty() {
+                return Err("raw key requires text".into());
+            }
             k.key_type(sub_arg).await?;
             "typed".into()
         }
-        "enter" => { k.send_keys("Enter").await?; "enter sent".into() }
+        "enter" => {
+            k.send_keys("Enter").await?;
+            "enter sent".into()
+        }
         "url" => k.get_url().await,
         "navigate" => {
-            if sub_arg.is_empty() { return Err("raw navigate requires URL".into()); }
+            if sub_arg.is_empty() {
+                return Err("raw navigate requires URL".into());
+            }
             k.navigate(sub_arg, false).await?;
             format!("navigated to {}", sub_arg)
         }

@@ -27,8 +27,10 @@ impl GrokSemantics {
 
     /// Quick page state observation.
     pub async fn get_state(&self) -> GrokState {
-        let data = self.kimi.eval_json(
-            r#"JSON.stringify((()=>{
+        let data = self
+            .kimi
+            .eval_json(
+                r#"JSON.stringify((()=>{
                 const ta=document.querySelector('textarea');
                 return {
                     has_input: !!ta,
@@ -37,17 +39,24 @@ impl GrokSemantics {
                     is_initialized: !document.body.innerText.includes('Talk to Grok')
                 };
             })())"#,
-        ).await;
+            )
+            .await;
 
         match data {
             Some(v) => GrokState {
-                has_input: v.get("has_input").and_then(|b| b.as_bool()).unwrap_or(false),
+                has_input: v
+                    .get("has_input")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false),
                 has_conversation: v
                     .get("has_conversation")
                     .and_then(|b| b.as_bool())
                     .unwrap_or(false),
                 url: v.get("url").and_then(|s| s.as_str()).unwrap_or("").into(),
-                is_initialized: v.get("is_initialized").and_then(|b| b.as_bool()).unwrap_or(false),
+                is_initialized: v
+                    .get("is_initialized")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false),
             },
             None => GrokState::default(),
         }
@@ -69,7 +78,10 @@ impl GrokSemantics {
 
         // Wait for page to hydrate (textarea must exist)
         for _ in 0..20 {
-            let (has_ta, _) = self.kimi.eval_js("!!document.querySelector('textarea')").await;
+            let (has_ta, _) = self
+                .kimi
+                .eval_js("!!document.querySelector('textarea')")
+                .await;
             if has_ta == "true" {
                 break;
             }
@@ -77,19 +89,23 @@ impl GrokSemantics {
         }
 
         // Dismiss "Talk to Grok" banner if present
-        let (has_banner, _) = self.kimi.eval_js(
-            "document.body.innerText.includes('Talk to Grok') ? 'true' : 'false'"
-        ).await;
+        let (has_banner, _) = self
+            .kimi
+            .eval_js("document.body.innerText.includes('Talk to Grok') ? 'true' : 'false'")
+            .await;
         if has_banner == "true" {
             debug!("dismissing Talk to Grok banner");
-            let _ = self.kimi.eval_js(
-                r#"(()=>{
+            let _ = self
+                .kimi
+                .eval_js(
+                    r#"(()=>{
                     const btns=Array.from(document.querySelectorAll('button,[role=button]'));
                     const talk=btns.find(b=>(b.textContent||'').includes('Talk to Grok'));
                     if(talk){talk.click();return'clicked'}
                     return'not found';
                 })()"#,
-            ).await;
+                )
+                .await;
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
@@ -109,12 +125,15 @@ impl GrokSemantics {
         }
 
         // Step 1: Clear any stale text from previous failed sends
-        let _ = self.kimi.eval_js(
-            r#"(()=>{
+        let _ = self
+            .kimi
+            .eval_js(
+                r#"(()=>{
                 const ta=document.querySelector('textarea');
                 if(ta){ta.focus();ta.value='';ta.dispatchEvent(new Event('input',{bubbles:true}));}
             })()"#,
-        ).await;
+            )
+            .await;
         tokio::time::sleep(Duration::from_millis(150)).await;
 
         // Step 2: Type the message via OS-level keyboard
@@ -122,11 +141,16 @@ impl GrokSemantics {
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Step 3: Verify text is in the textarea
-        let (val, _) = self.kimi.eval_js(
-            "document.querySelector('textarea')?.value || ''"
-        ).await;
+        let (val, _) = self
+            .kimi
+            .eval_js("document.querySelector('textarea')?.value || ''")
+            .await;
         if !val.contains(text) && val.len() < text.len() {
-            debug!(expected = text, actual = val, "key_type may not have landed");
+            debug!(
+                expected = text,
+                actual = val,
+                "key_type may not have landed"
+            );
             return Err(AdapterError::SendFailed {
                 reason: format!("text not in textarea after key_type: '{}'", val),
             });
@@ -137,14 +161,17 @@ impl GrokSemantics {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         // Step 5: Verify textarea was cleared (indicating send went through)
-        let (after_val, _) = self.kimi.eval_js(
-            "document.querySelector('textarea')?.value || ''"
-        ).await;
+        let (after_val, _) = self
+            .kimi
+            .eval_js("document.querySelector('textarea')?.value || ''")
+            .await;
         if !after_val.is_empty() {
             debug!("textarea not cleared after Enter, trying fallback click on send button");
             // Fallback: click the icon-only send button
-            let _ = self.kimi.eval_js(
-                r#"(()=>{
+            let _ = self
+                .kimi
+                .eval_js(
+                    r#"(()=>{
                     const btns=Array.from(document.querySelectorAll('button'));
                     const send=btns.find(b=>{
                         const t=(b.textContent||'').trim();
@@ -153,7 +180,8 @@ impl GrokSemantics {
                     if(send){send.click();return'clicked'}
                     return'no send button';
                 })()"#,
-            ).await;
+                )
+                .await;
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
@@ -168,9 +196,7 @@ impl GrokSemantics {
         let mut stable_count = 0;
 
         loop {
-            let (len_str, _) = self.kimi.eval_js(
-                "document.body.innerText.length"
-            ).await;
+            let (len_str, _) = self.kimi.eval_js("document.body.innerText.length").await;
             let len: usize = len_str.parse().unwrap_or(0);
 
             if len == last_len {
@@ -226,13 +252,12 @@ impl GrokSemantics {
         ).await;
 
         match serde_json::from_str::<serde_json::Value>(&raw) {
-            Ok(v) if v.get("found").and_then(|b| b.as_bool()).unwrap_or(false) => {
-                v.get("text")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("")
-                    .trim()
-                    .to_string()
-            }
+            Ok(v) if v.get("found").and_then(|b| b.as_bool()).unwrap_or(false) => v
+                .get("text")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string(),
             _ => String::new(),
         }
     }
@@ -241,7 +266,10 @@ impl GrokSemantics {
     pub async fn new_conversation(&self) -> Result<()> {
         self.kimi.navigate(GROK_URL, false).await?;
         for _ in 0..20 {
-            let (has_ta, _) = self.kimi.eval_js("!!document.querySelector('textarea')").await;
+            let (has_ta, _) = self
+                .kimi
+                .eval_js("!!document.querySelector('textarea')")
+                .await;
             if has_ta == "true" {
                 break;
             }

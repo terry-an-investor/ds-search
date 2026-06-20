@@ -41,9 +41,14 @@ async fn eval_js_handles_bool() {
 #[tokio::test]
 async fn eval_json_parses_object() {
     let m = MockKimi::new().await;
-    m.set_eval_response("JSON.stringify", serde_json::json!(r#"{"has_input":true,"message_count":3}"#));
+    m.set_eval_response(
+        "JSON.stringify",
+        serde_json::json!(r#"{"has_input":true,"message_count":3}"#),
+    );
     let k = KimiPrimitives::new(m.server.uri(), "t");
-    let r = k.eval_json("JSON.stringify({has_input: true, message_count: 3})").await;
+    let r = k
+        .eval_json("JSON.stringify({has_input: true, message_count: 3})")
+        .await;
     assert!(r.is_some());
     let o = r.unwrap();
     assert_eq!(o["has_input"], serde_json::json!(true));
@@ -84,7 +89,10 @@ async fn find_tab_found() {
 #[tokio::test]
 async fn get_fast_state_ok() {
     let m = MockKimi::new().await;
-    m.set_eval_response("has_input", fast_state_json(true, false, 5, "https://chat.deepseek.com", true));
+    m.set_eval_response(
+        "has_input",
+        fast_state_json(true, false, 5, "https://chat.deepseek.com", true),
+    );
     let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let st = s.get_fast_state().await;
     assert!(st.has_input);
@@ -162,10 +170,13 @@ async fn extract_last_response_empty() {
 #[tokio::test]
 async fn get_browser_log_ok() {
     let m = MockKimi::new().await;
-    m.set_eval_response("window.__dsLog", browser_log_json(&[
-        serde_json::json!({"lvl": "log", "t": 1000, "m": "test"}),
-        serde_json::json!({"lvl": "fetch", "t": 1100, "m": "https://api.example.com"}),
-    ]));
+    m.set_eval_response(
+        "window.__dsLog",
+        browser_log_json(&[
+            serde_json::json!({"lvl": "log", "t": 1000, "m": "test"}),
+            serde_json::json!({"lvl": "fetch", "t": 1100, "m": "https://api.example.com"}),
+        ]),
+    );
     let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let log = s.get_browser_log(false).await;
     assert_eq!(log.len(), 2);

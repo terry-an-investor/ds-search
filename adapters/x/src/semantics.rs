@@ -31,11 +31,14 @@ impl XSemantics {
         self.kimi.navigate(url, false).await?;
         // Wait for page to load
         for _ in 0..30 {
-            let (count_str, _) = self.kimi.eval_js(
-                "document.querySelectorAll('article').length"
-            ).await;
+            let (count_str, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('article').length")
+                .await;
             let count: usize = count_str.parse().unwrap_or(0);
-            if count > 0 { break; }
+            if count > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -141,7 +144,7 @@ impl XSemantics {
         ).await;
 
         let tweets: Vec<Tweet> = serde_json::from_str(&raw).unwrap_or_default();
-        
+
         if tweets.is_empty() {
             return Err(AdapterError::ElementNotFound {
                 selector: "article".to_string(),

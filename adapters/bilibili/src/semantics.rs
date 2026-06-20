@@ -42,11 +42,14 @@ impl BilibiliSemantics {
         self.kimi.navigate(&search_url, false).await?;
         // Wait for results to load
         for _ in 0..30 {
-            let (count_str, _) = self.kimi.eval_js(
-                "document.querySelectorAll('.video.i_wrapper .bili-video-card').length"
-            ).await;
+            let (count_str, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('.video.i_wrapper .bili-video-card').length")
+                .await;
             let count: usize = count_str.parse().unwrap_or(0);
-            if count > 0 { break; }
+            if count > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -65,11 +68,14 @@ impl BilibiliSemantics {
         let page_url = format!("{}?keyword={}&page={}", base, keyword, page);
         self.kimi.navigate(&page_url, false).await?;
         for _ in 0..30 {
-            let (count_str, _) = self.kimi.eval_js(
-                "document.querySelectorAll('.video.i_wrapper .bili-video-card').length"
-            ).await;
+            let (count_str, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('.video.i_wrapper .bili-video-card').length")
+                .await;
             let count: usize = count_str.parse().unwrap_or(0);
-            if count > 0 { break; }
+            if count > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -103,8 +109,10 @@ impl BilibiliSemantics {
     /// Sort search results.
     pub async fn sort_by(&self, order: SortOrder) -> Result<()> {
         let label = order.as_label();
-        let (found, _) = self.kimi.eval_js(&format!(
-            r#"(function(){{
+        let (found, _) = self
+            .kimi
+            .eval_js(&format!(
+                r#"(function(){{
                 const btns=document.querySelectorAll('button');
                 for(let i=0;i<btns.length;i++){{
                     if((btns[i].textContent||'').includes('{}')){{
@@ -113,8 +121,9 @@ impl BilibiliSemantics {
                 }}
                 return'false';
             }})()"#,
-            label
-        )).await;
+                label
+            ))
+            .await;
         if found != "true" {
             return Err(AdapterError::ElementNotFound {
                 selector: format!("sort button '{}'", label),
@@ -132,7 +141,8 @@ impl BilibiliSemantics {
         // Wait for page load
         for _ in 0..30 {
             let (title_str, _) = self.kimi.eval_js("document.title").await;
-            if !title_str.is_empty() && title_str != "哔哩哔哩 (゜-゜)つロ 干杯~-bilibili" {
+            if !title_str.is_empty() && title_str != "哔哩哔哩 (゜-゜)つロ 干杯~-bilibili"
+            {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
@@ -158,17 +168,35 @@ impl BilibiliSemantics {
 
         let v: serde_json::Value = serde_json::from_str(&raw).unwrap_or_default();
         let mut details = VideoDetails {
-            title: v.get("title").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-            url: v.get("url").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-            description: v.get("description").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-            tags: v.get("tags").and_then(|a|a.as_array())
-                .map(|arr| arr.iter().filter_map(|t| t.as_str().map(|s| s.to_string())).collect())
+            title: v
+                .get("title")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            url: v
+                .get("url")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            description: v
+                .get("description")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            tags: v
+                .get("tags")
+                .and_then(|a| a.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default(),
             ..Default::default()
         };
 
         // Extract stats from body lines
-        if let Some(lines) = v.get("body_first_lines").and_then(|a|a.as_array()) {
+        if let Some(lines) = v.get("body_first_lines").and_then(|a| a.as_array()) {
             let texts: Vec<&str> = lines.iter().filter_map(|l| l.as_str()).collect();
             details = extract_stats_from_lines(details, &texts);
         }
@@ -209,12 +237,36 @@ fn parse_video_results(raw: &str) -> Vec<VideoResult> {
     };
     arr.iter()
         .map(|item| VideoResult {
-            title: item.get("title").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-            url: item.get("url").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-            duration: item.get("duration").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-            views: item.get("views").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-            uploader: item.get("uploader").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-            upload_date: item.get("upload_date").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+            title: item
+                .get("title")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            url: item
+                .get("url")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            duration: item
+                .get("duration")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            views: item
+                .get("views")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            uploader: item
+                .get("uploader")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            upload_date: item
+                .get("upload_date")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
             is_ad: item.get("is_ad").and_then(|b| b.as_bool()).unwrap_or(false),
         })
         .collect()
@@ -223,19 +275,21 @@ fn parse_video_results(raw: &str) -> Vec<VideoResult> {
 fn extract_stats_from_lines(mut details: VideoDetails, lines: &[&str]) -> VideoDetails {
     for line in lines {
         let trimmed = line.trim();
-        if trimmed.contains("万") && details.views.is_empty()
-            && !trimmed.contains(":") && !trimmed.contains("-")
+        if trimmed.contains("万")
+            && details.views.is_empty()
+            && !trimmed.contains(":")
+            && !trimmed.contains("-")
         {
             details.views = trimmed.to_string();
-        } else if (trimmed.contains("赞") || trimmed.contains("点赞"))
-            && details.likes.is_empty()
+        } else if (trimmed.contains("赞") || trimmed.contains("点赞")) && details.likes.is_empty()
         {
             details.likes = trimmed.to_string();
         } else if trimmed.contains("币") && details.coins.is_empty() {
             details.coins = trimmed.to_string();
         } else if trimmed.contains("藏") && details.favorites.is_empty() {
             details.favorites = trimmed.to_string();
-        } else if trimmed.contains("20") && trimmed.contains("-") && details.upload_date.is_empty() {
+        } else if trimmed.contains("20") && trimmed.contains("-") && details.upload_date.is_empty()
+        {
             details.upload_date = trimmed.to_string();
         }
         // Uploader: line before 发消息

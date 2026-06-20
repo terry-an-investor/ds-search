@@ -53,10 +53,16 @@ impl GeminiSemantics {
             }
         }
         for _ in 0..20 {
-            let (has, _) = self.kimi.eval_js(&format!(
-                "!!document.querySelector('{}') ? 'true' : 'false'", INPUT_SELECTOR
-            )).await;
-            if has == "true" { break; }
+            let (has, _) = self
+                .kimi
+                .eval_js(&format!(
+                    "!!document.querySelector('{}') ? 'true' : 'false'",
+                    INPUT_SELECTOR
+                ))
+                .await;
+            if has == "true" {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -100,7 +106,9 @@ impl GeminiSemantics {
     pub async fn send_message(&self, text: &str) -> Result<()> {
         let text = text.trim();
         if text.is_empty() {
-            return Err(AdapterError::SendFailed { reason: "empty message".into() });
+            return Err(AdapterError::SendFailed {
+                reason: "empty message".into(),
+            });
         }
 
         // Focus and clear
@@ -115,9 +123,13 @@ impl GeminiSemantics {
         tokio::time::sleep(Duration::from_millis(300)).await;
 
         // Verify
-        let (content, _) = self.kimi.eval_js(&format!(
-            "document.querySelector('{}')?.textContent || ''", INPUT_SELECTOR
-        )).await;
+        let (content, _) = self
+            .kimi
+            .eval_js(&format!(
+                "document.querySelector('{}')?.textContent || ''",
+                INPUT_SELECTOR
+            ))
+            .await;
         if !content.contains(text) {
             // Fallback: try fill via dispatch
             let _ = self.kimi.eval_js(&format!(
@@ -144,17 +156,19 @@ impl GeminiSemantics {
     /// Wait for response by polling response-container count until stable.
     pub async fn wait_for_response(&self, timeout_secs: u64) -> bool {
         let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_secs);
-        let (start_str, _) = self.kimi.eval_js(
-            "document.querySelectorAll('.response-container').length"
-        ).await;
+        let (start_str, _) = self
+            .kimi
+            .eval_js("document.querySelectorAll('.response-container').length")
+            .await;
         let start_count: usize = start_str.parse().unwrap_or(0);
         let mut last_count = start_count;
         let mut stable = 0;
 
         loop {
-            let (s, _) = self.kimi.eval_js(
-                "document.querySelectorAll('.response-container').length"
-            ).await;
+            let (s, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('.response-container').length")
+                .await;
             let count: usize = s.parse().unwrap_or(0);
 
             if count > start_count {
@@ -173,20 +187,25 @@ impl GeminiSemantics {
                 }
             }
 
-            if tokio::time::Instant::now() > deadline { return false; }
+            if tokio::time::Instant::now() > deadline {
+                return false;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
 
     /// Extract the latest Gemini response text (no thinking).
     pub async fn extract_last_response(&self) -> String {
-        let (raw, _) = self.kimi.eval_js(
-            r#"(()=>{
+        let (raw, _) = self
+            .kimi
+            .eval_js(
+                r#"(()=>{
                 const containers=document.querySelectorAll('.model-response-text');
                 if(containers.length===0)return'';
                 return containers[containers.length-1].textContent.trim().substring(0,10000);
             })()"#,
-        ).await;
+            )
+            .await;
         raw.trim().to_string()
     }
 
@@ -194,8 +213,10 @@ impl GeminiSemantics {
     /// Expands the "Show thinking" button first if needed.
     pub async fn extract_thinking(&self) -> Option<String> {
         // Find the last .model-thoughts container and expand it
-        let _ = self.kimi.eval_js(
-            r#"(()=>{
+        let _ = self
+            .kimi
+            .eval_js(
+                r#"(()=>{
                 const thoughts=document.querySelectorAll('.model-thoughts');
                 if(thoughts.length===0)return;
                 const last=thoughts[thoughts.length-1];
@@ -204,12 +225,15 @@ impl GeminiSemantics {
                     btn.click();
                 }
             })()"#,
-        ).await;
+            )
+            .await;
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         // Extract thinking content
-        let (raw, _) = self.kimi.eval_js(
-            r#"(()=>{
+        let (raw, _) = self
+            .kimi
+            .eval_js(
+                r#"(()=>{
                 const containers=document.querySelectorAll('.thoughts-content');
                 if(containers.length===0)return'';
                 const last=containers[containers.length-1];
@@ -218,7 +242,8 @@ impl GeminiSemantics {
                 text=text.replace(/^Show thinking\s*/,'');
                 return text.substring(0,10000);
             })()"#,
-        ).await;
+            )
+            .await;
 
         let text = raw.trim().to_string();
         if text.is_empty() { None } else { Some(text) }
@@ -244,10 +269,16 @@ impl GeminiSemantics {
     pub async fn new_conversation(&self) -> Result<()> {
         self.kimi.navigate(GEMINI_URL, false).await?;
         for _ in 0..20 {
-            let (has, _) = self.kimi.eval_js(&format!(
-                "!!document.querySelector('{}') ? 'true' : 'false'", INPUT_SELECTOR
-            )).await;
-            if has == "true" { break; }
+            let (has, _) = self
+                .kimi
+                .eval_js(&format!(
+                    "!!document.querySelector('{}') ? 'true' : 'false'",
+                    INPUT_SELECTOR
+                ))
+                .await;
+            if has == "true" {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())

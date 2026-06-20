@@ -8,4 +8,4 @@ mod models;
 mod semantics;
 
 pub use models::*;
-pub use semantics::{WallstreetSemantics, LiveGlobalSemantics};
+pub use semantics::{LiveGlobalSemantics, WallstreetSemantics};

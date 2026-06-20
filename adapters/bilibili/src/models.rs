@@ -15,10 +15,10 @@ pub struct VideoResult {
 /// Sort order for search results.
 #[derive(Debug, Clone, Copy)]
 pub enum SortOrder {
-    Relevance,   // 综合排序
-    MostPlayed,  // 最多播放
-    Newest,      // 最新发布
-    MostDanmaku, // 最多弹幕
+    Relevance,     // 综合排序
+    MostPlayed,    // 最多播放
+    Newest,        // 最新发布
+    MostDanmaku,   // 最多弹幕
     MostFavorited, // 最多收藏
 }
 

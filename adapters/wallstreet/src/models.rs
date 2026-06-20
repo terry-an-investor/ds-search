@@ -3,10 +3,10 @@
 /// A single news flash item from the live feed.
 #[derive(Debug, Clone)]
 pub struct LiveItem {
-    pub time: String,      // e.g. "21:17"
-    pub title: String,     // e.g. "消息人士：以色列在伊拉克..."
-    pub content: String,   // full body text after the title
-    pub index: usize,      // position in feed (0 = newest)
+    pub time: String,    // e.g. "21:17"
+    pub title: String,   // e.g. "消息人士：以色列在伊拉克..."
+    pub content: String, // full body text after the title
+    pub index: usize,    // position in feed (0 = newest)
 }
 
 /// An article from the homepage.

@@ -1,6 +1,6 @@
 use std::io::IsTerminal;
-use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 /// Initialize structured logging.
 ///
@@ -53,7 +53,11 @@ pub fn log_browser_entries(entries: &[crate::models::BrowserLogEntry], max: usiz
         tracing::debug!("browser log: (empty)");
         return;
     }
-    tracing::debug!("browser log (last {} of {}):", max.min(entries.len()), entries.len());
+    tracing::debug!(
+        "browser log (last {} of {}):",
+        max.min(entries.len()),
+        entries.len()
+    );
     for entry in entries.iter().rev().take(max).rev() {
         tracing::debug!(
             lvl = %entry.lvl,

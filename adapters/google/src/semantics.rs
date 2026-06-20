@@ -65,7 +65,12 @@ impl GoogleSemantics {
             "web" => "udm=web",
             "books" => "udm=36",
             "all" | "" => "",
-            _ => return Err(AdapterError::Kimi(format!("unknown mode '{}'. Use: all,ai,images,videos,shopping,short_videos,forums,news,web,books", mode))),
+            _ => {
+                return Err(AdapterError::Kimi(format!(
+                    "unknown mode '{}'. Use: all,ai,images,videos,shopping,short_videos,forums,news,web,books",
+                    mode
+                )));
+            }
         };
         self.search_url(query, param).await
     }
@@ -81,11 +86,14 @@ impl GoogleSemantics {
         self.kimi.navigate(&url, false).await?;
 
         for _ in 0..20 {
-            let (count, _) = self.kimi.eval_js(
-                "document.querySelectorAll('h3').length"
-            ).await;
+            let (count, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('h3').length")
+                .await;
             let n: usize = count.parse().unwrap_or(0);
-            if n > 0 { break; }
+            if n > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -99,11 +107,14 @@ impl GoogleSemantics {
         self.kimi.navigate(&url, false).await?;
 
         for _ in 0..20 {
-            let (count, _) = self.kimi.eval_js(
-                "document.querySelectorAll('h3').length"
-            ).await;
+            let (count, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('h3').length")
+                .await;
             let n: usize = count.parse().unwrap_or(0);
-            if n > 0 { break; }
+            if n > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -128,11 +139,14 @@ impl GoogleSemantics {
 
         // Wait for results
         for _ in 0..20 {
-            let (count, _) = self.kimi.eval_js(
-                "document.querySelectorAll('h3').length"
-            ).await;
+            let (count, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('h3').length")
+                .await;
             let n: usize = count.parse().unwrap_or(0);
-            if n > 0 { break; }
+            if n > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -191,9 +205,10 @@ impl GoogleSemantics {
 
     /// Check if there's a next page available.
     pub async fn has_next_page(&self) -> bool {
-        let (raw, _) = self.kimi.eval_js(
-            "!!document.querySelector('#pnnext')"
-        ).await;
+        let (raw, _) = self
+            .kimi
+            .eval_js("!!document.querySelector('#pnnext')")
+            .await;
         raw == "true"
     }
 
@@ -212,10 +227,13 @@ impl GoogleSemantics {
         // Wait for new results
         for _ in 0..20 {
             tokio::time::sleep(Duration::from_millis(500)).await;
-            let (count, _) = self.kimi.eval_js(
-                "document.querySelectorAll('h3').length"
-            ).await;
-            if count.parse::<usize>().unwrap_or(0) > 0 { break; }
+            let (count, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('h3').length")
+                .await;
+            if count.parse::<usize>().unwrap_or(0) > 0 {
+                break;
+            }
         }
         Ok(())
     }
@@ -226,26 +244,32 @@ impl GoogleSemantics {
 
     /// Extract featured snippet or knowledge panel text.
     pub async fn extract_featured_snippet(&self) -> String {
-        let (raw, _) = self.kimi.eval_js(
-            "(function(){\
+        let (raw, _) = self
+            .kimi
+            .eval_js(
+                "(function(){\
                 var el=document.querySelector('.ifM9O,.EyBRub,.kp-wholepage,.LMRCxd');\
                 if(!el)return'';\
                 var t=el.innerText.trim();\
                 if(t.indexOf('Choose what')>=0||t.indexOf('feedback')>=0)return'';\
                 return t;\
-            })()"
-        ).await;
+            })()",
+            )
+            .await;
         raw.trim().to_string()
     }
 
     /// Extract AI Overview (Google's AI-generated summary) if present.
     pub async fn extract_ai_overview(&self) -> String {
-        let (raw, _) = self.kimi.eval_js(
-            "(function(){\
+        let (raw, _) = self
+            .kimi
+            .eval_js(
+                "(function(){\
                 var el=document.querySelector('[class*=ai],.hdVBI');\
                 return el?el.innerText.trim():'';\
-            })()"
-        ).await;
+            })()",
+            )
+            .await;
         raw.trim().to_string()
     }
 
@@ -294,9 +318,21 @@ fn parse_results(raw: &str) -> Vec<SearchResult> {
     if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(raw) {
         for item in arr {
             results.push(SearchResult {
-                title: item.get("title").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-                url: item.get("url").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-                snippet: item.get("snippet").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                title: item
+                    .get("title")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                url: item
+                    .get("url")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                snippet: item
+                    .get("snippet")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
             });
         }
     }
@@ -308,8 +344,9 @@ fn urlencoding(s: &str) -> String {
     let mut encoded = String::with_capacity(s.len() * 3);
     for byte in s.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' |
-            b'-' | b'_' | b'.' | b'~' => encoded.push(byte as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char)
+            }
             b' ' => encoded.push('+'),
             _ => {
                 encoded.push('%');

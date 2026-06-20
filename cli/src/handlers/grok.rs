@@ -12,10 +12,15 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
         "ensure" => {
             grok.ensure_tab().await?;
             let s = grok.get_state().await;
-            format!("url={} ta={} conv={}", s.url, s.has_input, s.has_conversation)
+            format!(
+                "url={} ta={} conv={}",
+                s.url, s.has_input, s.has_conversation
+            )
         }
         "send" => {
-            if sub_arg.is_empty() { return Err("send requires text".into()); }
+            if sub_arg.is_empty() {
+                return Err("send requires text".into());
+            }
             grok.ensure_tab().await?;
             grok.send_message(sub_arg).await?;
             "dispatched".into()
@@ -25,7 +30,10 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
             if r.is_empty() { "(empty)".into() } else { r }
         }
         "wait" => format!("response_ready: {}", grok.wait_for_response(30).await),
-        "new" => { grok.new_conversation().await?; "ok".into() }
+        "new" => {
+            grok.new_conversation().await?;
+            "ok".into()
+        }
         _ => return Err("subcommands: state ensure send extract wait new".into()),
     })
 }

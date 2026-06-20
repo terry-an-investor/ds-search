@@ -64,11 +64,14 @@ impl WallstreetSemantics {
         self.kimi.send_keys("Enter").await?;
         // Wait for results
         for _ in 0..20 {
-            let (count, _) = self.kimi.eval_js(
-                "document.querySelectorAll('a[href*=\"/articles/\"]').length"
-            ).await;
+            let (count, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('a[href*=\"/articles/\"]').length")
+                .await;
             let n: usize = count.parse().unwrap_or(0);
-            if n > 0 { break; }
+            if n > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -113,11 +116,14 @@ impl LiveGlobalSemantics {
         }
         // Wait for live items to appear
         for _ in 0..30 {
-            let (count_str, _) = self.kimi.eval_js(
-                "document.querySelectorAll('.live-item').length"
-            ).await;
+            let (count_str, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('.live-item').length")
+                .await;
             let count: usize = count_str.parse().unwrap_or(0);
-            if count > 0 { break; }
+            if count > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -126,8 +132,10 @@ impl LiveGlobalSemantics {
     /// Switch to a different category tab.
     pub async fn switch_category(&self, category: LiveCategory) -> Result<()> {
         let label = category.as_label();
-        let (found, _) = self.kimi.eval_js(&format!(
-            r#"(function(){{
+        let (found, _) = self
+            .kimi
+            .eval_js(&format!(
+                r#"(function(){{
                 const items=document.querySelectorAll('.nav-item');
                 for(let i=0;i<items.length;i++){{
                     if(items[i].textContent.trim()==='{}'){{
@@ -136,8 +144,9 @@ impl LiveGlobalSemantics {
                 }}
                 return'false';
             }})()"#,
-            label
-        )).await;
+                label
+            ))
+            .await;
         if found != "true" {
             return Err(AdapterError::ElementNotFound {
                 selector: format!("category tab '{}'", label),
@@ -145,11 +154,14 @@ impl LiveGlobalSemantics {
         }
         // Wait for items to reload
         for _ in 0..30 {
-            let (count_str, _) = self.kimi.eval_js(
-                "document.querySelectorAll('.live-item').length"
-            ).await;
+            let (count_str, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('.live-item').length")
+                .await;
             let count: usize = count_str.parse().unwrap_or(0);
-            if count > 0 { break; }
+            if count > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -225,9 +237,10 @@ impl LiveGlobalSemantics {
 
     /// Poll for new items since last check. Returns newly appeared items.
     pub async fn poll_new_items(&self, last_count: usize) -> Vec<LiveItem> {
-        let (count_str, _) = self.kimi.eval_js(
-            "document.querySelectorAll('.live-item').length"
-        ).await;
+        let (count_str, _) = self
+            .kimi
+            .eval_js("document.querySelectorAll('.live-item').length")
+            .await;
         let count: usize = count_str.parse().unwrap_or(0);
         if count <= last_count {
             return vec![];
@@ -240,22 +253,62 @@ impl LiveGlobalSemantics {
 // ── Helpers ──
 
 fn parse_articles(raw: &str) -> Vec<Article> {
-    let v: serde_json::Value = match serde_json::from_str(raw) { Ok(v) => v, Err(_) => return vec![] };
-    let arr = match v.as_array() { Some(a) => a, None => return vec![] };
-    arr.iter().map(|item| Article {
-        title: item.get("title").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-        url: item.get("url").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-        summary: item.get("summary").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-    }).collect()
+    let v: serde_json::Value = match serde_json::from_str(raw) {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+    let arr = match v.as_array() {
+        Some(a) => a,
+        None => return vec![],
+    };
+    arr.iter()
+        .map(|item| Article {
+            title: item
+                .get("title")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            url: item
+                .get("url")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            summary: item
+                .get("summary")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+        })
+        .collect()
 }
 
 fn parse_live_items(raw: &str) -> Vec<LiveItem> {
-    let v: serde_json::Value = match serde_json::from_str(raw) { Ok(v) => v, Err(_) => return vec![] };
-    let arr = match v.as_array() { Some(a) => a, None => return vec![] };
-    arr.iter().map(|item| LiveItem {
-        time: item.get("time").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-        title: item.get("title").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-        content: item.get("content").and_then(|s|s.as_str()).unwrap_or("").to_string(),
-        index: item.get("index").and_then(|n|n.as_u64()).unwrap_or(0) as usize,
-    }).collect()
+    let v: serde_json::Value = match serde_json::from_str(raw) {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+    let arr = match v.as_array() {
+        Some(a) => a,
+        None => return vec![],
+    };
+    arr.iter()
+        .map(|item| LiveItem {
+            time: item
+                .get("time")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            title: item
+                .get("title")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            content: item
+                .get("content")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
+            index: item.get("index").and_then(|n| n.as_u64()).unwrap_or(0) as usize,
+        })
+        .collect()
 }

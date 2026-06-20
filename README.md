@@ -35,6 +35,7 @@ cargo run -- meta scan
 | `weread` | weread.qq.com | Search books, open books, get book info/chapters, read page text, AI outlines, highlights |
 | `google` | google.com | Web/image/video/news/shopping/forums/books/AI search, pagination, time filters, snippets |
 | `aistudio` | aistudio.google.com | Send prompts, extract responses, select model, set thinking level, browse history, get API code |
+| `x` | x.com | Extract tweet threads (main tweet + self-replies), external links, engagement stats |
 
 ## Usage
 
@@ -53,6 +54,7 @@ ds --session <name> <command> <subcommand> [args...]
 ```bash
 # DeepSeek
 ds deepseek send "Explain Rust ownership"
+ds deepseek ask "Explain Rust ownership"   # send + wait-for-stable + extract (atomic)
 ds deepseek extract
 ds deepseek thinking
 ds deepseek toggle search
@@ -85,6 +87,10 @@ ds weread open <url>
 ds weread chapters
 ds weread highlights
 
+# X (Twitter)
+ds x thread <tweet_url>
+ds x links <tweet_url>
+
 # Meta (page inspection)
 ds meta scan
 ds meta save my-page
@@ -97,16 +103,20 @@ ds meta watch 500x20
 ```
 .
 ├── pilot/              # Core library — Kimi WebBridge HTTP client + error types
-├── cli/                # CLI binary — command registry and handlers
+├── cli/                # CLI binary — command dispatch + registry
+│   ├── src/main.rs     # Entry point + command registry (one line per command)
+│   ├── src/types.rs    # Shared CmdResult / Handler / kimi() / split_arg() helpers
+│   └── src/handlers/   # One file per command (deepseek.rs, google.rs, meta.rs, ...)
 ├── adapters/           # Site-specific adapter crates
-│   ├── deepseek/       # DeepSeek Chat
+│   ├── deepseek/       # DeepSeek Chat (semantics + models)
 │   ├── grok/           # Grok
 │   ├── gemini/         # Google Gemini
 │   ├── bilibili/       # Bilibili
 │   ├── wallstreet/     # Wallstreetcn (general + live/global)
 │   ├── weread/         # WeRead
 │   ├── google/         # Google Search
-│   └── google-aistudio/# Google AI Studio
+│   ├── google-aistudio/# Google AI Studio
+│   └── x/              # X.com (tweet threads)
 ├── knowledge/          # Site structure documentation (YAML)
 └── Makefile            # Build, test, and cleanup targets
 ```
@@ -126,7 +136,7 @@ make clean-system  # Clean ~/.cargo cache (stale crate sources)
 1. Create `knowledge/<domain>.yaml` documenting the site's DOM structure, APIs, and pitfalls
 2. Create `adapters/<name>/` with `Cargo.toml`, `src/lib.rs`, `src/models.rs`, `src/semantics.rs`
 3. Add the crate to `Cargo.toml` workspace members and `cli/Cargo.toml` dependencies
-4. Add a `handle_<name>()` async function and register it in `registry()` in `cli/src/main.rs`
+4. Create `cli/src/handlers/<name>.rs` exposing `pub async fn handle(session, arg) -> CmdResult`, declare it in `cli/src/handlers/mod.rs`, and register it in `registry()` in `cli/src/main.rs`
 5. Build with `cargo build` and test against the live site
 
 ## License

@@ -13,7 +13,7 @@ const WEREAD_URL: &str = "https://weread.qq.com";
 
 #[derive(Debug, Clone)]
 pub struct WeReadSemantics {
-    pub kimi: KimiPrimitives,  // pub for URL check in CLI handler
+    pub kimi: KimiPrimitives, // pub for URL check in CLI handler
 }
 
 impl WeReadSemantics {
@@ -51,10 +51,13 @@ impl WeReadSemantics {
         self.kimi.navigate(&url, false).await?;
         // Wait for SPA to load
         for _ in 0..30 {
-            let (ready, _) = self.kimi.eval_js(
-                "!!(document.querySelector('.readerTopBar_title_chapter'))"
-            ).await;
-            if ready == "true" { break; }
+            let (ready, _) = self
+                .kimi
+                .eval_js("!!(document.querySelector('.readerTopBar_title_chapter'))")
+                .await;
+            if ready == "true" {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -80,11 +83,14 @@ impl WeReadSemantics {
 
         // Wait for search results
         for _ in 0..20 {
-            let (count, _) = self.kimi.eval_js(
-                "document.querySelectorAll('a[href*=\"/web/reader/\"]').length"
-            ).await;
+            let (count, _) = self
+                .kimi
+                .eval_js("document.querySelectorAll('a[href*=\"/web/reader/\"]').length")
+                .await;
             let n: usize = count.parse().unwrap_or(0);
-            if n > 0 { break; }
+            if n > 0 {
+                break;
+            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
         Ok(())
@@ -219,23 +225,29 @@ impl WeReadSemantics {
     /// Extract only the popular highlights/notes from the current page.
     /// This is the richest text source for getting actual book content.
     pub async fn extract_highlights(&self) -> String {
-        let (raw, _) = self.kimi.eval_js(
-            "(function(){\
+        let (raw, _) = self
+            .kimi
+            .eval_js(
+                "(function(){\
                 var notes=document.querySelector('.readerNoteList');\
                 return notes?notes.innerText.trim():'';\
-            })()"
-        ).await;
+            })()",
+            )
+            .await;
         raw
     }
 
     /// Extract AI outline of the book (structure + key points).
     pub async fn extract_ai_outline(&self) -> String {
-        let (raw, _) = self.kimi.eval_js(
-            "(function(){\
+        let (raw, _) = self
+            .kimi
+            .eval_js(
+                "(function(){\
                 var outline=document.querySelector('.wr_outline_book_detail_main');\
                 return outline?outline.innerText.trim():'';\
-            })()"
-        ).await;
+            })()",
+            )
+            .await;
         raw
     }
 
@@ -323,8 +335,16 @@ fn parse_book_links(raw: &str) -> Vec<BookInfo> {
             books.push(BookInfo {
                 book_id: String::new(),
                 long_book_id: String::new(),
-                title: item.get("title").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-                author: item.get("author").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                title: item
+                    .get("title")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
+                author: item
+                    .get("author")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
                 cover: String::new(),
                 publisher: String::new(),
                 format: String::new(),
@@ -345,19 +365,49 @@ fn parse_book_info(raw: &str) -> Option<BookInfo> {
         return None;
     }
     Some(BookInfo {
-        book_id: v.get("bookId").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-        long_book_id: v.get("longBookId").and_then(|s| s.as_str()).unwrap_or(
-            v.get("bookId").and_then(|s| s.as_str()).unwrap_or("")
-        ).to_string(),
-        title: v.get("title").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-        author: v.get("author").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-        cover: v.get("cover").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-        publisher: v.get("publisher").and_then(|s| s.as_str()).unwrap_or("").to_string(),
-        format: v.get("format").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+        book_id: v
+            .get("bookId")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
+        long_book_id: v
+            .get("longBookId")
+            .and_then(|s| s.as_str())
+            .unwrap_or(v.get("bookId").and_then(|s| s.as_str()).unwrap_or(""))
+            .to_string(),
+        title: v
+            .get("title")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
+        author: v
+            .get("author")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
+        cover: v
+            .get("cover")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
+        publisher: v
+            .get("publisher")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
+        format: v
+            .get("format")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
         price: v.get("price").and_then(|n| n.as_f64()).unwrap_or(0.0),
         rating: v.get("rating").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
         rating_count: v.get("ratingCount").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-        intro: v.get("intro").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+        intro: v
+            .get("intro")
+            .and_then(|s| s.as_str())
+            .unwrap_or("")
+            .to_string(),
         total_chapters: v.get("totalChapters").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
     })
 }
@@ -369,12 +419,20 @@ fn parse_chapter_list(raw: &str) -> Vec<ChapterInfo> {
             chapters.push(ChapterInfo {
                 chapter_uid: item.get("chapterUid").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
                 chapter_idx: item.get("chapterIdx").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-                title: item.get("title").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                title: item
+                    .get("title")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
                 word_count: item.get("wordCount").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
                 level: item.get("level").and_then(|n| n.as_u64()).unwrap_or(1) as u32,
                 price: item.get("price").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
                 paid: item.get("paid").and_then(|n| n.as_u64()).unwrap_or(0) as u32,
-                tar: item.get("tar").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                tar: item
+                    .get("tar")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("")
+                    .to_string(),
             });
         }
     }

@@ -35,8 +35,11 @@ impl MockKimi {
                         let result = if let Some(v) = eval_map.get(code) {
                             v.clone()
                         } else {
-                            eval_map.iter().find(|(k, _)| code.contains(k.as_str()))
-                                .map(|(_, v)| v.clone()).unwrap_or(Value::Null)
+                            eval_map
+                                .iter()
+                                .find(|(k, _)| code.contains(k.as_str()))
+                                .map(|(_, v)| v.clone())
+                                .unwrap_or(Value::Null)
                         };
                         serde_json::json!({"value": result})
                     }
@@ -50,12 +53,17 @@ impl MockKimi {
                     "close_tab" => serde_json::json!({"success": true}),
                     _ => serde_json::json!({}),
                 };
-                ResponseTemplate::new(200).set_body_json(serde_json::json!({"ok": true, "data": data}))
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({"ok": true, "data": data}))
             })
             .mount(&server)
             .await;
 
-        Self { server, eval_responses, find_tab_found }
+        Self {
+            server,
+            eval_responses,
+            find_tab_found,
+        }
     }
 
     pub fn set_eval_response(&self, script_pattern: &str, value: Value) {
@@ -70,15 +78,21 @@ impl MockKimi {
 }
 
 pub fn fast_state_json(
-    has_input: bool, is_streaming: bool, message_count: usize,
-    url: &str, has_conversation: bool,
+    has_input: bool,
+    is_streaming: bool,
+    message_count: usize,
+    url: &str,
+    has_conversation: bool,
 ) -> Value {
-    Value::String(serde_json::json!({
-        "has_input": has_input, "is_streaming": is_streaming,
-        "message_count": message_count, "url": url,
-        "has_conversation": has_conversation,
-        "title": "DeepSeek"
-    }).to_string())
+    Value::String(
+        serde_json::json!({
+            "has_input": has_input, "is_streaming": is_streaming,
+            "message_count": message_count, "url": url,
+            "has_conversation": has_conversation,
+            "title": "DeepSeek"
+        })
+        .to_string(),
+    )
 }
 
 pub fn extract_response_json(exists: bool, content: &str) -> Value {

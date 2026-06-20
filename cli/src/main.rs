@@ -41,13 +41,24 @@ async fn main() {
     };
 
     match run_command(&cmd, &arg, &session).await {
-        Ok(output) => { if !output.is_empty() { println!("{}", output); } }
-        Err(e) => { eprintln!("error: {}", e); std::process::exit(1); }
+        Ok(output) => {
+            if !output.is_empty() {
+                println!("{}", output);
+            }
+        }
+        Err(e) => {
+            eprintln!("error: {}", e);
+            std::process::exit(1);
+        }
     }
 }
 
 fn list_commands() -> String {
-    registry().keys().map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
+    registry()
+        .keys()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 async fn run_command(cmd: &str, arg: &str, session: &str) -> CmdResult {
@@ -61,19 +72,34 @@ async fn run_command(cmd: &str, arg: &str, session: &str) -> CmdResult {
 
 fn registry() -> HashMap<&'static str, Handler> {
     let mut m: HashMap<&'static str, Handler> = HashMap::new();
-    m.insert("status",    Box::new(|s, a| Box::pin(status::handle(s, a))));
-    m.insert("deepseek",  Box::new(|s, a| Box::pin(deepseek::handle(s, a))));
-    m.insert("l2",        Box::new(|s, a| Box::pin(deepseek::handle(s, a))));
-    m.insert("grok",      Box::new(|s, a| Box::pin(grok::handle(s, a))));
-    m.insert("gemini",    Box::new(|s, a| Box::pin(gemini::handle(s, a))));
-    m.insert("bilibili",  Box::new(|s, a| Box::pin(bilibili::handle(s, a))));
-    m.insert("wallstreet",Box::new(|s, a| Box::pin(wallstreet::handle(s, a))));
-    m.insert("livenews",  Box::new(|s, a| Box::pin(livenews::handle(s, a))));
-    m.insert("weread",    Box::new(|s, a| Box::pin(weread::handle(s, a))));
-    m.insert("google",    Box::new(|s, a| Box::pin(google::handle(s, a))));
-    m.insert("aistudio",  Box::new(|s, a| Box::pin(aistudio::handle(s, a))));
-    m.insert("x",         Box::new(|s, a| Box::pin(x::handle(s, a))));
-    m.insert("meta",      Box::new(|s, a| Box::pin(meta::handle(s, a))));
-    m.insert("raw",       Box::new(|s, a| Box::pin(raw::handle(s, a))));
+    m.insert("status", Box::new(|s, a| Box::pin(status::handle(s, a))));
+    m.insert(
+        "deepseek",
+        Box::new(|s, a| Box::pin(deepseek::handle(s, a))),
+    );
+    m.insert("l2", Box::new(|s, a| Box::pin(deepseek::handle(s, a))));
+    m.insert("grok", Box::new(|s, a| Box::pin(grok::handle(s, a))));
+    m.insert("gemini", Box::new(|s, a| Box::pin(gemini::handle(s, a))));
+    m.insert(
+        "bilibili",
+        Box::new(|s, a| Box::pin(bilibili::handle(s, a))),
+    );
+    m.insert(
+        "wallstreet",
+        Box::new(|s, a| Box::pin(wallstreet::handle(s, a))),
+    );
+    m.insert(
+        "livenews",
+        Box::new(|s, a| Box::pin(livenews::handle(s, a))),
+    );
+    m.insert("weread", Box::new(|s, a| Box::pin(weread::handle(s, a))));
+    m.insert("google", Box::new(|s, a| Box::pin(google::handle(s, a))));
+    m.insert(
+        "aistudio",
+        Box::new(|s, a| Box::pin(aistudio::handle(s, a))),
+    );
+    m.insert("x", Box::new(|s, a| Box::pin(x::handle(s, a))));
+    m.insert("meta", Box::new(|s, a| Box::pin(meta::handle(s, a))));
+    m.insert("raw", Box::new(|s, a| Box::pin(raw::handle(s, a))));
     m
 }

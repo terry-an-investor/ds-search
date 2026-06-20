@@ -61,12 +61,7 @@ impl KimiPrimitives {
         });
 
         let start = Instant::now();
-        let resp = self
-            .client
-            .post(&url)
-            .json(&body)
-            .send()
-            .await?;
+        let resp = self.client.post(&url).json(&body).send().await?;
 
         let elapsed = start.elapsed();
         let status = resp.status();
@@ -107,7 +102,10 @@ impl KimiPrimitives {
     /// Evaluate JavaScript in the browser. Returns (value_string, exit_code).
     pub async fn eval_js(&self, script: &str) -> (String, i32) {
         trace!(script_len = script.len(), "eval_js");
-        match self._kimi("evaluate", serde_json::json!({"code": script})).await {
+        match self
+            ._kimi("evaluate", serde_json::json!({"code": script}))
+            .await
+        {
             Ok(data) => {
                 if let Some(v) = data.get("value") {
                     if v.is_null() {
@@ -115,7 +113,12 @@ impl KimiPrimitives {
                     }
                     if v.is_boolean() {
                         return (
-                            if v.as_bool().unwrap() { "true" } else { "false" }.into(),
+                            if v.as_bool().unwrap() {
+                                "true"
+                            } else {
+                                "false"
+                            }
+                            .into(),
                             0,
                         );
                     }
@@ -159,10 +162,7 @@ impl KimiPrimitives {
         // The JS `JSON.stringify({...})` may be returned as a JSON-encoded
         // string, i.e. the raw text is `"{\"key\":\"val\"}"`.
         // We strip the outer quotes, unescape, and parse again.
-        if text.len() >= 2
-            && text.starts_with('"')
-            && text.ends_with('"')
-        {
+        if text.len() >= 2 && text.starts_with('"') && text.ends_with('"') {
             let inner = &text[1..text.len() - 1];
             // Unescape JSON escapes: \" → ", \\ → \, \n → actual newline, etc.
             let unescaped = inner
@@ -212,7 +212,10 @@ impl KimiPrimitives {
             ._kimi("find_tab", serde_json::json!({"url": url_contains}))
             .await
         {
-            Ok(data) => data.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
+            Ok(data) => data
+                .get("success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
             Err(_) => false,
         }
     }
@@ -252,7 +255,11 @@ impl TabInfo {
         Some(Self {
             tab_id: v.get("tabId")?.as_u64()?,
             url: v.get("url")?.as_str()?.to_string(),
-            title: v.get("title").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+            title: v
+                .get("title")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .to_string(),
             active: v.get("active").and_then(|b| b.as_bool()).unwrap_or(false),
         })
     }

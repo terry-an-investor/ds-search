@@ -76,23 +76,30 @@ impl AistudioSemantics {
         );
         let (result, _) = self.kimi.eval_js(&code).await;
         if result.contains("no_textarea") {
-            return Err(AdapterError::ElementNotFound { selector: "textarea".into() });
+            return Err(AdapterError::ElementNotFound {
+                selector: "textarea".into(),
+            });
         }
         Ok(())
     }
 
     /// Click the Run button.
     async fn click_run(&self) -> Result<()> {
-        let (found, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (found, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const btn = Array.from(document.querySelectorAll('button'))
                     .find(b => b.textContent.includes('Run') && !b.disabled);
                 if (btn) { btn.click(); return 'ok'; }
                 return 'not_found';
             })()"#,
-        ).await;
+            )
+            .await;
         if found.contains("not_found") {
-            return Err(AdapterError::ElementNotFound { selector: "Run button".into() });
+            return Err(AdapterError::ElementNotFound {
+                selector: "Run button".into(),
+            });
         }
         Ok(())
     }
@@ -138,8 +145,10 @@ impl AistudioSemantics {
     /// Extract the response text from the page body.
     /// The response appears in document.body.innerText between "Model" timestamp and "thumb_up".
     pub async fn extract_response(&self) -> String {
-        let (text, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (text, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const bodyText = document.body.innerText;
                 // Find the last "Model" timestamp marker
                 const modelMarkers = [...bodyText.matchAll(/\nModel\s+\d/g)];
@@ -160,7 +169,8 @@ impl AistudioSemantics {
                 }
                 return after.substring(0, endIdx).trim();
             })()"#,
-        ).await;
+            )
+            .await;
         text
     }
 
@@ -170,8 +180,10 @@ impl AistudioSemantics {
 
     /// Get the currently selected model name from the settings panel.
     pub async fn current_model(&self) -> String {
-        let (text, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (text, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const card = document.querySelector('.model-selector-card');
                 if (!card) return '(unknown)';
                 const title = card.querySelector('.model-title-text, [class*=model-title]');
@@ -180,7 +192,8 @@ impl AistudioSemantics {
                 const lines = card.textContent.trim().split('\n');
                 return lines.length > 0 ? lines[0].trim() : '(unknown)';
             })()"#,
-        ).await;
+            )
+            .await;
         // Trim trailing model ID (starts with "gemini-")
         if let Some(idx) = text.find("gemini-") {
             text[..idx].trim().to_string()
@@ -191,16 +204,21 @@ impl AistudioSemantics {
 
     /// Open the model selection dialog.
     pub async fn open_model_selector(&self) -> Result<()> {
-        let (result, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (result, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const card = document.querySelector('.model-selector-card');
                 if (!card) return 'no_selector';
                 card.click();
                 return 'ok';
             })()"#,
-        ).await;
+            )
+            .await;
         if result.contains("no_selector") {
-            return Err(AdapterError::ElementNotFound { selector: ".model-selector-card".into() });
+            return Err(AdapterError::ElementNotFound {
+                selector: ".model-selector-card".into(),
+            });
         }
         tokio::time::sleep(Duration::from_millis(800)).await;
         Ok(())
@@ -230,8 +248,12 @@ impl AistudioSemantics {
         let (result, _) = self.kimi.eval_js(&code).await;
         match result.as_str() {
             "selected" => Ok(()),
-            "no_dialog" => Err(AdapterError::PageNotReady { reason: "model dialog not open".into() }),
-            _ => Err(AdapterError::SendFailed { reason: format!("model '{}' not found in dialog", model_id) }),
+            "no_dialog" => Err(AdapterError::PageNotReady {
+                reason: "model dialog not open".into(),
+            }),
+            _ => Err(AdapterError::SendFailed {
+                reason: format!("model '{}' not found in dialog", model_id),
+            }),
         }
     }
 
@@ -257,7 +279,9 @@ impl AistudioSemantics {
         );
         let (result, _) = self.kimi.eval_js(&code).await;
         if result.contains("no_select") {
-            return Err(AdapterError::ElementNotFound { selector: "thinking level selector".into() });
+            return Err(AdapterError::ElementNotFound {
+                selector: "thinking level selector".into(),
+            });
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
         Ok(())
@@ -270,16 +294,21 @@ impl AistudioSemantics {
     /// Start a new chat by clicking the New chat button.
     pub async fn new_chat(&self) -> Result<()> {
         self.ensure_tab().await?;
-        let (result, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (result, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const btn = Array.from(document.querySelectorAll('button'))
                     .find(b => b.getAttribute('aria-label') === 'New chat');
                 if (btn) { btn.click(); return 'ok'; }
                 return 'not_found';
             })()"#,
-        ).await;
+            )
+            .await;
         if result.contains("not_found") {
-            return Err(AdapterError::ElementNotFound { selector: "New chat button".into() });
+            return Err(AdapterError::ElementNotFound {
+                selector: "New chat button".into(),
+            });
         }
         tokio::time::sleep(Duration::from_millis(1500)).await;
         Ok(())
@@ -287,28 +316,36 @@ impl AistudioSemantics {
 
     /// Get the current prompt title (H1).
     pub async fn current_title(&self) -> String {
-        let (text, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (text, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const h1 = document.querySelector('h1');
                 return h1 ? h1.textContent.trim() : '';
             })()"#,
-        ).await;
+            )
+            .await;
         text
     }
 
     /// Click the "Get code" button and extract the code snippet.
     pub async fn get_code(&self) -> Result<String> {
-        let (result, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (result, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const btn = Array.from(document.querySelectorAll('button'))
                     .find(b => b.textContent.includes('Get code'));
                 if (!btn) return 'no_get_code_btn';
                 btn.click();
                 return 'clicked';
             })()"#,
-        ).await;
+            )
+            .await;
         if result.contains("no_get_code_btn") {
-            return Err(AdapterError::ElementNotFound { selector: "Get code button".into() });
+            return Err(AdapterError::ElementNotFound {
+                selector: "Get code button".into(),
+            });
         }
         tokio::time::sleep(Duration::from_millis(1000)).await;
 
@@ -355,8 +392,7 @@ impl AistudioSemantics {
             n
         )).await;
 
-        let items: Vec<serde_json::Value> =
-            serde_json::from_str(&raw).unwrap_or_default();
+        let items: Vec<serde_json::Value> = serde_json::from_str(&raw).unwrap_or_default();
         items
             .into_iter()
             .map(|v| HistoryItem {
@@ -391,7 +427,9 @@ impl AistudioSemantics {
         );
         let (result, _) = self.kimi.eval_js(&code).await;
         if result.contains("not_found") {
-            return Err(AdapterError::SendFailed { reason: format!("prompt '{}' not found in history", name) });
+            return Err(AdapterError::SendFailed {
+                reason: format!("prompt '{}' not found in history", name),
+            });
         }
         tokio::time::sleep(Duration::from_millis(2000)).await;
         Ok(())
@@ -399,9 +437,10 @@ impl AistudioSemantics {
 
     /// Check if the page has an active response (model turn present).
     pub async fn has_response(&self) -> bool {
-        let (text, _) = self.kimi.eval_js(
-            "document.querySelectorAll('.chat-turn-container.model').length"
-        ).await;
+        let (text, _) = self
+            .kimi
+            .eval_js("document.querySelectorAll('.chat-turn-container.model').length")
+            .await;
         text.trim().parse::<i32>().unwrap_or(0) > 0
     }
 }

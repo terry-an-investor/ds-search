@@ -56,11 +56,17 @@ impl AistudioModel {
             "flash-lite" | "flashlite" | "gemini-3.1-flash-lite" => Some(AistudioModel::FlashLite),
             "flash" | "gemini-3-flash-preview" => Some(AistudioModel::Flash),
             "pro" | "gemini-3.1-pro-preview" => Some(AistudioModel::Pro),
-            "flash-image" | "nano-banana-2" | "gemini-3.1-flash-image-preview" => Some(AistudioModel::FlashImage),
-            "pro-image" | "nano-banana-pro" | "gemini-3-pro-image-preview" => Some(AistudioModel::ProImage),
+            "flash-image" | "nano-banana-2" | "gemini-3.1-flash-image-preview" => {
+                Some(AistudioModel::FlashImage)
+            }
+            "pro-image" | "nano-banana-pro" | "gemini-3-pro-image-preview" => {
+                Some(AistudioModel::ProImage)
+            }
             "pro-latest" | "gemini-pro-latest" => Some(AistudioModel::ProLatest),
             "flash-latest" | "gemini-flash-latest" => Some(AistudioModel::FlashLatest),
-            "flash-lite-latest" | "gemini-flash-lite-latest" => Some(AistudioModel::FlashLiteLatest),
+            "flash-lite-latest" | "gemini-flash-lite-latest" => {
+                Some(AistudioModel::FlashLiteLatest)
+            }
             _ => None,
         }
     }

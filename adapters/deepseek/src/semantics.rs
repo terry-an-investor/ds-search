@@ -75,12 +75,15 @@ impl DeepSeekSemantics {
 
     /// Retrieve accumulated browser-side log entries and optionally clear them.
     pub async fn get_browser_log(&self, clear: bool) -> Vec<BrowserLogEntry> {
-        let data = self.kimi.eval_json(
-            r#"JSON.stringify({
+        let data = self
+            .kimi
+            .eval_json(
+                r#"JSON.stringify({
                 entries: (window.__dsLog || []).slice(-50),
                 count: (window.__dsLog || []).length
-            })"#
-        ).await;
+            })"#,
+            )
+            .await;
 
         if clear {
             let _ = self.kimi.eval_js("window.__dsLog = [];").await;
@@ -141,8 +144,14 @@ impl DeepSeekSemantics {
 
         match data {
             Some(v) => FastState {
-                has_input: v.get("has_input").and_then(|b| b.as_bool()).unwrap_or(false),
-                is_streaming: v.get("is_streaming").and_then(|b| b.as_bool()).unwrap_or(false),
+                has_input: v
+                    .get("has_input")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false),
+                is_streaming: v
+                    .get("is_streaming")
+                    .and_then(|b| b.as_bool())
+                    .unwrap_or(false),
                 message_count: v
                     .get("message_count")
                     .and_then(|n| n.as_u64())
@@ -171,13 +180,19 @@ impl DeepSeekSemantics {
                 break; // need to open/reopen tab (handled below)
             }
             // Verify the page is fully interactive (textarea rendered)
-            let (val, _) = self.kimi.eval_js("!!document.querySelector('textarea')").await;
+            let (val, _) = self
+                .kimi
+                .eval_js("!!document.querySelector('textarea')")
+                .await;
             if val != "true" {
                 // textarea missing — page still loading, wait
                 debug!("on deepseek domain but no textarea yet, waiting for hydration");
                 for _ in 0..10 {
                     tokio::time::sleep(Duration::from_millis(500)).await;
-                    let (v, _) = self.kimi.eval_js("!!document.querySelector('textarea')").await;
+                    let (v, _) = self
+                        .kimi
+                        .eval_js("!!document.querySelector('textarea')")
+                        .await;
                     if v == "true" {
                         break;
                     }
@@ -198,9 +213,13 @@ impl DeepSeekSemantics {
             return Ok(());
         }
         if self.kimi.find_tab("https://chat.deepseek.com").await {
-            self.kimi.navigate("https://chat.deepseek.com", false).await?;
+            self.kimi
+                .navigate("https://chat.deepseek.com", false)
+                .await?;
         } else {
-            self.kimi.navigate("https://chat.deepseek.com", true).await?;
+            self.kimi
+                .navigate("https://chat.deepseek.com", true)
+                .await?;
         }
         self.install_browser_logging().await;
         Ok(())
@@ -226,12 +245,17 @@ impl DeepSeekSemantics {
     /// Waits for the page to fully settle and the virtual list to render.
     pub async fn new_conversation(&self) -> Result<()> {
         self.close_stale_tabs().await;
-        self.kimi.navigate("https://chat.deepseek.com/", false).await?;
+        self.kimi
+            .navigate("https://chat.deepseek.com/", false)
+            .await?;
 
         // Wait for navigation to settle + textarea to appear
         for _ in 0..30 {
             let url = self.kimi.get_url().await;
-            let (has_ta, _) = self.kimi.eval_js("!!document.querySelector('textarea')").await;
+            let (has_ta, _) = self
+                .kimi
+                .eval_js("!!document.querySelector('textarea')")
+                .await;
             if url.trim_end_matches('/') == "https://chat.deepseek.com" && has_ta == "true" {
                 break;
             }
@@ -250,8 +274,10 @@ impl DeepSeekSemantics {
     /// Select chat mode. Returns true on success.
     pub async fn select_mode(&self, mode: ChatMode) -> bool {
         let label = mode.as_label();
-        let (ok, _) = self.kimi.eval_js(&format!(
-            r#"(() => {{
+        let (ok, _) = self
+            .kimi
+            .eval_js(&format!(
+                r#"(() => {{
                 const radios = document.querySelectorAll('[role="radio"]');
                 for (const r of radios) {{
                     if (r.textContent.includes('{}')) {{
@@ -262,8 +288,9 @@ impl DeepSeekSemantics {
                 }}
                 return false;
             }})()"#,
-            label
-        )).await;
+                label
+            ))
+            .await;
         ok == "true"
     }
 
@@ -323,8 +350,10 @@ impl DeepSeekSemantics {
         tokio::time::sleep(Duration::from_millis(150)).await;
 
         // Step 2: dispatch Enter keydown
-        let (ok2, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (ok2, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const ta = document.querySelector('textarea');
                 if (!ta) return 'no-ta';
                 ta.dispatchEvent(new KeyboardEvent('keydown', {
@@ -332,8 +361,9 @@ impl DeepSeekSemantics {
                     bubbles: true, cancelable: true
                 }));
                 return 'ok';
-            })()"#
-        ).await;
+            })()"#,
+            )
+            .await;
 
         if ok2.contains("no-ta") {
             return Err(AdapterError::ElementNotFound {
@@ -406,13 +436,12 @@ impl DeepSeekSemantics {
         "#).await;
 
         match data {
-            Some(v) if v.get("exists").and_then(|b| b.as_bool()).unwrap_or(false) => {
-                v.get("content")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("")
-                    .trim()
-                    .to_string()
-            }
+            Some(v) if v.get("exists").and_then(|b| b.as_bool()).unwrap_or(false) => v
+                .get("content")
+                .and_then(|s| s.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string(),
             _ => String::new(),
         }
     }
@@ -423,8 +452,10 @@ impl DeepSeekSemantics {
     /// is removed and the button returns to the normal arrow icon.
     /// This is the definitive "can send now" signal.
     pub async fn send_button_enabled(&self) -> bool {
-        let (val, _) = self.kimi.eval_js(
-            r#"(() => {
+        let (val, _) = self
+            .kimi
+            .eval_js(
+                r#"(() => {
                 const ta = document.querySelector('textarea');
                 if (!ta) return true; // no textarea, assume ready
                 // Find input area containing both textarea and send button
@@ -436,21 +467,27 @@ impl DeepSeekSemantics {
                 if (!area) return true;
                 // If any ds-icon-button--disabled exists in the input area, send button is disabled
                 return area.querySelector('.ds-icon-button--disabled') === null;
-            })()"#
-        ).await;
+            })()"#,
+            )
+            .await;
         val == "true"
     }
     /// Check if the page is showing a service-level error (rate limit, server busy, etc).
     /// Returns Some(error_message) if an error is detected, None if the page looks healthy.
     pub async fn check_service_error(&self) -> Option<String> {
-        let (val, _) = self.kimi.eval_js(r#"
+        let (val, _) = self
+            .kimi
+            .eval_js(
+                r#"
         (() => {
             const t = document.body.innerText || '';
             if (t.includes('消息发送过于频繁')) return 'rate limited: 消息发送过于频繁，请稍后重试';
             if (t.includes('服务器繁忙')) return 'server busy: 服务器繁忙，请稍后重试';
             return '';
         })()
-        "#).await;
+        "#,
+            )
+            .await;
         if val.is_empty() { None } else { Some(val) }
     }
 
@@ -477,11 +514,7 @@ impl DeepSeekSemantics {
         "#).await;
 
         let text = raw.0.trim().to_string();
-        if text.is_empty() {
-            None
-        } else {
-            Some(text)
-        }
+        if text.is_empty() { None } else { Some(text) }
     }
 
     // ── Full send pipeline (stability-confirmed) ──
@@ -569,7 +602,6 @@ impl DeepSeekSemantics {
         warn!("no stable response after 20 fallbacks");
         Err(AdapterError::NoResponse)
     }
-
 }
 
 impl From<KimiPrimitives> for DeepSeekSemantics {
