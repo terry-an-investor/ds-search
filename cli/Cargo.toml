@@ -19,6 +19,7 @@ wallstreet = { path = "../adapters/wallstreet" }
 google = { path = "../adapters/google" }
 google-aistudio = { path = "../adapters/google-aistudio" }
 x = { path = "../adapters/x" }
+fs2 = "0.4"
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

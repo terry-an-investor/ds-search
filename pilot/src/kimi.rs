@@ -7,11 +7,16 @@ use crate::error::{AdapterError, Result};
 use reqwest::Client;
 use serde_json::Value;
 use std::time::{Duration, Instant};
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:10086";
 const DEFAULT_SESSION: &str = "deepseek";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// Max attempts for transient (5xx / connection) errors on read-only calls.
+const READONLY_RETRY_MAX: u32 = 3;
+/// Backoff between read-only retries. WebBridge 502s are usually transient
+/// (browser tab suspended / extension momentary unresponsiveness).
+const READONLY_RETRY_DELAY: Duration = Duration::from_millis(500);
 
 /// Generic browser operations via Kimi WebBridge HTTP API.
 #[derive(Debug, Clone)]
@@ -52,7 +57,52 @@ impl Default for KimiPrimitives {
 
 impl KimiPrimitives {
     /// Core HTTP primitive: POST to Kimi WebBridge /command.
+    /// No retry — use for state-mutating actions (navigate, key_type, send_keys)
+    /// where a retry could cause double-execution.
     async fn _kimi(&self, action: &str, args: Value) -> Result<Value> {
+        self._kimi_once(action, args).await
+    }
+
+    /// Read-only variant with automatic retry on transient errors (5xx,
+    /// connection resets). Safe for idempotent queries (evaluate, find_tab,
+    /// list_tabs, get_url) — never for navigate/send.
+    async fn _kimi_readonly(&self, action: &str, args: Value) -> Result<Value> {
+        let mut last_err: Option<AdapterError> = None;
+        for attempt in 0..READONLY_RETRY_MAX {
+            match self._kimi_once(action, args.clone()).await {
+                Ok(v) => return Ok(v),
+                Err(e) if Self::is_transient(&e) => {
+                    last_err = Some(e);
+                    if attempt + 1 < READONLY_RETRY_MAX {
+                        warn!(
+                            action = action,
+                            attempt = attempt + 1,
+                            max = READONLY_RETRY_MAX,
+                            error = %last_err.as_ref().unwrap(),
+                            "transient WebBridge error, retrying"
+                        );
+                        tokio::time::sleep(READONLY_RETRY_DELAY).await;
+                    }
+                }
+                Err(e) => return Err(e), // non-transient (business error), don't retry
+            }
+        }
+        Err(last_err.unwrap_or_else(|| AdapterError::Kimi("retry exhausted".into())))
+    }
+
+    /// A transient error is a 5xx HTTP status or connection failure — the kind
+    /// that typically resolves on its own (browser tab woke up, extension
+    /// reconnected). Business errors (ok:false) are NOT transient.
+    fn is_transient(err: &AdapterError) -> bool {
+        match err {
+            AdapterError::Http(e) => e.status().map(|s| s.is_server_error()).unwrap_or(true),
+            AdapterError::Kimi(msg) => msg.contains("HTTP 5"),
+            _ => false,
+        }
+    }
+
+    /// Single attempt: POST to Kimi WebBridge /command.
+    async fn _kimi_once(&self, action: &str, args: Value) -> Result<Value> {
         let url = format!("{}/command", self.base_url);
         let body = serde_json::json!({
             "action": action,
@@ -103,7 +153,7 @@ impl KimiPrimitives {
     pub async fn eval_js(&self, script: &str) -> (String, i32) {
         trace!(script_len = script.len(), "eval_js");
         match self
-            ._kimi("evaluate", serde_json::json!({"code": script}))
+            ._kimi_readonly("evaluate", serde_json::json!({"code": script}))
             .await
         {
             Ok(data) => {
@@ -209,7 +259,7 @@ impl KimiPrimitives {
     /// Check if a tab with URL containing the string exists.
     pub async fn find_tab(&self, url_contains: &str) -> bool {
         match self
-            ._kimi("find_tab", serde_json::json!({"url": url_contains}))
+            ._kimi_readonly("find_tab", serde_json::json!({"url": url_contains}))
             .await
         {
             Ok(data) => data
@@ -222,7 +272,10 @@ impl KimiPrimitives {
 
     /// List all open tabs.
     pub async fn list_tabs(&self) -> Vec<TabInfo> {
-        match self._kimi("list_tabs", serde_json::json!({})).await {
+        match self
+            ._kimi_readonly("list_tabs", serde_json::json!({}))
+            .await
+        {
             Ok(data) => {
                 let tabs = data.get("tabs").and_then(|v| v.as_array());
                 match tabs {

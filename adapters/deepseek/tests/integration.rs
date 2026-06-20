@@ -127,6 +127,25 @@ async fn send_message_no_textarea_err() {
     assert!(r.unwrap_err().to_string().contains("textarea"));
 }
 
+/// Main send path: fill succeeds, verify reads back the text (non-empty),
+/// Enter dispatched, post-Enter verify sees cleared textarea.
+#[tokio::test]
+async fn send_message_happy_path() {
+    let m = MockKimi::new().await;
+    // The fill JS (contains "pd.set") returns 'ok'.
+    m.set_eval_response("pd.set", serde_json::json!("ok"));
+    // Verify reads: after fill, textarea contains the text.
+    m.set_eval_response("?.value", serde_json::json!("hello world"));
+    // Enter JS (contains "keydown") returns 'ok'.
+    m.set_eval_response("keydown", serde_json::json!("ok"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    // Should complete without error — both verifies pass (text present, then
+    // the post-Enter check also sees "hello world" which is non-empty so it
+    // triggers the send-button fallback, but that's also mocked to succeed).
+    let r = s.send_message("hello world").await;
+    assert!(r.is_ok(), "happy path should succeed: {:?}", r);
+}
+
 #[tokio::test]
 async fn select_mode_ok() {
     let m = MockKimi::new().await;

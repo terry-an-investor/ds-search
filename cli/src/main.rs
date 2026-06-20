@@ -9,9 +9,11 @@
 mod handlers;
 mod types;
 
+use fs2::FileExt;
 use handlers::*;
 use pilot::init_logging;
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use types::{CmdResult, Handler};
 
 #[tokio::main(flavor = "current_thread")]
@@ -40,6 +42,12 @@ async fn main() {
         String::new()
     };
 
+    // Acquire a per-session lock so two `ds --session X ...` processes can't
+    // drive the same browser tab group concurrently. `status` is exempt —
+    // it's a pure connectivity probe and shouldn't queue behind writers.
+    // The lock auto-releases when `_lock` drops at end of scope.
+    let _lock = acquire_session_lock(&session, &cmd);
+
     match run_command(&cmd, &arg, &session).await {
         Ok(output) => {
             if !output.is_empty() {
@@ -51,6 +59,33 @@ async fn main() {
             std::process::exit(1);
         }
     }
+}
+
+/// Acquire an exclusive file lock for the given session. Returns a guard
+/// that releases on drop. `status` and unknown commands skip locking.
+fn acquire_session_lock(session: &str, cmd: &str) -> Option<(std::fs::File, std::path::PathBuf)> {
+    if cmd == "status" {
+        return None;
+    }
+    let lock_path = std::env::temp_dir().join(format!("ds-{}.lock", session));
+    let file = match OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(false)
+        .open(&lock_path)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            tracing::warn!(path = %lock_path.display(), error = %e, "could not open session lock; proceeding unlocked");
+            return None;
+        }
+    };
+    if let Err(e) = file.lock_exclusive() {
+        tracing::warn!(error = %e, "could not acquire session lock; proceeding unlocked");
+        return None;
+    }
+    tracing::debug!(session = session, path = %lock_path.display(), "session lock acquired");
+    Some((file, lock_path))
 }
 
 fn list_commands() -> String {

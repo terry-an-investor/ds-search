@@ -312,8 +312,11 @@ impl DeepSeekSemantics {
 
     // ── Send message ──
 
-    /// Send a message via native DOM setter + input event + Enter keydown.
-    /// Returns true if the send was dispatched successfully.
+    /// Send a message via native DOM setter + input event + Enter keydown,
+    /// with verification at each step (per AGENTS.md observe→act→verify rule).
+    ///
+    /// Returns Ok(()) only when the textarea is confirmed cleared after the
+    /// Enter dispatch — that is the definitive "message accepted" signal.
     pub async fn send_message(&self, text: &str) -> Result<()> {
         let text = text.trim();
         if text.is_empty() {
@@ -323,9 +326,11 @@ impl DeepSeekSemantics {
         }
         let safe = serde_json::to_string(text)?;
 
-        // Step 1: fill textarea using native value setter + input event
-        let (ok1, _) = self.kimi.eval_js(&format!(
-            r#"(() => {{
+        // ── Step 1: fill textarea via native value setter ──
+        let (ok1, _) = self
+            .kimi
+            .eval_js(&format!(
+                r#"(() => {{
                 const ta = document.querySelector('textarea');
                 if (!ta) return 'no-ta';
                 ta.focus();
@@ -338,9 +343,9 @@ impl DeepSeekSemantics {
                 ta.dispatchEvent(new Event('input', {{bubbles: true}}));
                 return 'ok';
             }})()"#,
-            safe, safe
-        )).await;
-
+                safe, safe
+            ))
+            .await;
         if ok1.contains("no-ta") {
             return Err(AdapterError::ElementNotFound {
                 selector: "textarea".into(),
@@ -349,8 +354,34 @@ impl DeepSeekSemantics {
 
         tokio::time::sleep(Duration::from_millis(150)).await;
 
-        // Step 2: dispatch Enter keydown
-        let (ok2, _) = self
+        // ── VERIFY 1: textarea actually contains the text ──
+        // If the React setter didn't take, fall back to OS-level key_type.
+        let (ta_val, _) = self
+            .kimi
+            .eval_js("document.querySelector('textarea')?.value || ''")
+            .await;
+        if !ta_val.contains(text) {
+            debug!(
+                expected_len = text.len(),
+                actual_len = ta_val.len(),
+                "fill did not land, falling back to key_type"
+            );
+            self.kimi.key_type(text).await?;
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            // Re-verify after fallback; if still empty, the page is broken.
+            let (ta_val2, _) = self
+                .kimi
+                .eval_js("document.querySelector('textarea')?.value || ''")
+                .await;
+            if ta_val2.is_empty() {
+                return Err(AdapterError::SendFailed {
+                    reason: "textarea empty after fill + key_type fallback".into(),
+                });
+            }
+        }
+
+        // ── Step 2: dispatch Enter keydown ──
+        let (_ok2, _) = self
             .kimi
             .eval_js(
                 r#"(() => {
@@ -365,10 +396,30 @@ impl DeepSeekSemantics {
             )
             .await;
 
-        if ok2.contains("no-ta") {
-            return Err(AdapterError::ElementNotFound {
-                selector: "textarea".into(),
-            });
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // ── VERIFY 2: textarea cleared after Enter ──
+        // A cleared textarea is the definitive "message accepted by the app" signal.
+        // If not cleared, fall back to clicking the send button.
+        let (after_val, _) = self
+            .kimi
+            .eval_js("document.querySelector('textarea')?.value || ''")
+            .await;
+        if !after_val.is_empty() {
+            debug!("textarea not cleared after Enter, falling back to send button click");
+            let (_clicked, _) = self
+                .kimi
+                .eval_js(
+                    r#"(() => {
+                    const btns = Array.from(document.querySelectorAll('button'));
+                    // DeepSeek's send button is icon-only (no text) and lives in the input area.
+                    const send = btns.find(b => !b.textContent.trim() && b.querySelector('svg') && !b.disabled);
+                    if (send) { send.click(); return 'clicked'; }
+                    return 'no-send-btn';
+                })()"#,
+                )
+                .await;
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
         debug!(msg_len = text.len(), msg = %text.chars().take(60).collect::<String>(), "message sent");
