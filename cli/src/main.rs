@@ -92,7 +92,6 @@ fn registry() -> HashMap<&'static str, Handler> {
         "livenews",
         Box::new(|s, a| Box::pin(livenews::handle(s, a))),
     );
-    m.insert("weread", Box::new(|s, a| Box::pin(weread::handle(s, a))));
     m.insert("google", Box::new(|s, a| Box::pin(google::handle(s, a))));
     m.insert(
         "aistudio",

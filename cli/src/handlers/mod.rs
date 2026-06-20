@@ -14,5 +14,4 @@ pub mod meta;
 pub mod raw;
 pub mod status;
 pub mod wallstreet;
-pub mod weread;
 pub mod x;

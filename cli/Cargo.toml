@@ -16,7 +16,6 @@ grok = { path = "../adapters/grok" }
 gemini = { path = "../adapters/gemini" }
 bilibili = { path = "../adapters/bilibili" }
 wallstreet = { path = "../adapters/wallstreet" }
-weread = { path = "../adapters/weread" }
 google = { path = "../adapters/google" }
 google-aistudio = { path = "../adapters/google-aistudio" }
 x = { path = "../adapters/x" }

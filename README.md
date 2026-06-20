@@ -8,6 +8,7 @@ Multi-adapter browser automation CLI for interacting with web AI platforms and s
 
 - [Kimi WebBridge](https://kimi.com/features/webbridge) browser extension installed and running at `http://127.0.0.1:10086`
 - [Rust](https://rustup.rs/) (edition 2024)
+- **An active browser tab.** WebBridge's `evaluate` channel requires at least one open tab; commands return `HTTP 502` when the browser has no tabs. Run `ds raw navigate https://example.com` once to activate it if `ds status` says connected but `ds raw url` returns 502.
 
 ## Quick Start
 
@@ -32,7 +33,6 @@ cargo run -- meta scan
 | `bilibili` | bilibili.com | Search videos, extract results (title/duration/uploader), pagination, sort, video details |
 | `wallstreet` | wallstreetcn.com | Extract articles, search, article body extraction |
 | `livenews` | wallstreetcn.com/live/global | Extract live news items, filter by category, important-only toggle, polling |
-| `weread` | weread.qq.com | Search books, open books, get book info/chapters, read page text, AI outlines, highlights |
 | `google` | google.com | Web/image/video/news/shopping/forums/books/AI search, pagination, time filters, snippets |
 | `aistudio` | aistudio.google.com | Send prompts, extract responses, select model, set thinking level, browse history, get API code |
 | `x` | x.com | Extract tweet threads (main tweet + self-replies), external links, engagement stats |
@@ -50,6 +50,11 @@ ds --session <name> <command> <subcommand> [args...]
 ```
 
 ### Examples
+
+> Most site commands auto-navigate to the target via `ensure` (e.g. `ds deepseek send ...`).
+> A few read-only commands (`wallstreet articles`, `livenews items`) assume the page is already
+> loaded by that adapter — run `ds <site> ensure` first if you get empty results after switching
+> to a different site's tab.
 
 ```bash
 # DeepSeek
@@ -81,12 +86,6 @@ ds bilibili search "Rust tutorial"
 ds bilibili results 10
 ds bilibili sort newest
 
-# WeRead
-ds weread search "三体"
-ds weread open <url>
-ds weread chapters
-ds weread highlights
-
 # X (Twitter)
 ds x thread <tweet_url>
 ds x links <tweet_url>
@@ -113,11 +112,10 @@ ds meta watch 500x20
 │   ├── gemini/         # Google Gemini
 │   ├── bilibili/       # Bilibili
 │   ├── wallstreet/     # Wallstreetcn (general + live/global)
-│   ├── weread/         # WeRead
 │   ├── google/         # Google Search
 │   ├── google-aistudio/# Google AI Studio
 │   └── x/              # X.com (tweet threads)
-├── knowledge/          # Site structure documentation (YAML)
+├── knowledge/          # Site structure docs (YAML) + DOM baselines (scans/*.json)
 └── Makefile            # Build, test, and cleanup targets
 ```
 
