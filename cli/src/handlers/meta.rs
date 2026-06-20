@@ -3,6 +3,11 @@
 use crate::types::{CmdResult, kimi, split_arg};
 use pilot::KimiPrimitives;
 
+/// Shared DOM-scan JS used by both `meta save` and `meta diff`.
+/// Extracts url/title/inputs/buttons/bodySnippet/dynEls/timestamp.
+/// `meta save-structure` reuses this then strips the volatile fields.
+const SCAN_JS: &str = r#"JSON.stringify((()=>{const b=Array.from(document.querySelectorAll('button,[role=button],[role=radio],[role=switch],[role=tab]')).map(function(e){return{text:(e.textContent||'').trim().replace(/\s+/g,' ').substring(0,60),role:e.getAttribute('role')||e.tagName.toLowerCase(),checked:e.getAttribute('aria-checked')||e.getAttribute('aria-pressed')||'',disabled:e.disabled}}).filter(function(b){return b.text.length>0});const i=Array.from(document.querySelectorAll('textarea,input:not([type=hidden]),[contenteditable=true]')).map(function(e){return{tag:e.tagName,type:e.type||'',placeholder:e.placeholder||'',disabled:e.disabled}});const dynEls=Array.from(document.querySelectorAll('[class*=response],[class*=message],[class*=turn],[class*=thought]')).map(function(e){return{cls:e.className.split(' ').slice(0,2).join(' '),len:(e.textContent||'').length}});return JSON.stringify({url:location.href,title:document.title,inputs:i,buttons:b,bodySnippet:(document.body?.innerText||'').substring(0,2000),dynEls:dynEls,timestamp:Date.now()})})())"#;
+
 pub async fn handle(session: String, arg: String) -> CmdResult {
     let (sub, sub_arg) = split_arg(&arg);
     let k = kimi(&session);
@@ -12,10 +17,11 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
         "click" => do_meta_click(&k, sub_arg).await,
         "url" => Ok(k.get_url().await),
         "save" => do_meta_save(&k, sub_arg).await,
+        "save-structure" => do_meta_save_structure(&k, sub_arg).await,
         "diff" => do_meta_diff(&k, sub_arg).await,
         "watch" => do_meta_watch(&k, sub_arg).await,
         "response" => do_meta_response(&k, sub_arg).await,
-        _ => Err("meta subcommands: scan click url save diff watch response".into()),
+        _ => Err("meta subcommands: scan click url save save-structure diff watch response".into()),
     }
 }
 
@@ -170,6 +176,19 @@ async fn do_meta_click(kimi: &KimiPrimitives, text: &str) -> CmdResult {
 }
 
 async fn do_meta_save(kimi: &KimiPrimitives, name: &str) -> CmdResult {
+    do_save(kimi, name, false).await
+}
+
+/// Structural snapshot: stable fields only (url/title/inputs/buttons).
+/// Drops bodySnippet, dynEls, and timestamp so the file is suitable for
+/// version control as a regression baseline. Use for low-churn sites
+/// (AI chat: deepseek/grok/gemini/aistudio); never for time-sensitive
+/// feeds (livenews/wallstreet).
+async fn do_meta_save_structure(kimi: &KimiPrimitives, name: &str) -> CmdResult {
+    do_save(kimi, name, true).await
+}
+
+async fn do_save(kimi: &KimiPrimitives, name: &str, structural: bool) -> CmdResult {
     if name.is_empty() {
         return Err("meta save requires a name".into());
     }
@@ -177,9 +196,7 @@ async fn do_meta_save(kimi: &KimiPrimitives, name: &str) -> CmdResult {
     let dir = std::path::Path::new("knowledge/scans");
     std::fs::create_dir_all(dir)?;
     let path = dir.join(format!("{}.json", safe_name));
-    let (scan_raw, _) = kimi.eval_js(
-        r#"JSON.stringify((()=>{const b=Array.from(document.querySelectorAll('button,[role=button],[role=radio],[role=switch],[role=tab]')).map(function(e){return{text:(e.textContent||'').trim().replace(/\s+/g,' ').substring(0,60),role:e.getAttribute('role')||e.tagName.toLowerCase(),checked:e.getAttribute('aria-checked')||e.getAttribute('aria-pressed')||'',disabled:e.disabled}}).filter(function(b){return b.text.length>0});const i=Array.from(document.querySelectorAll('textarea,input:not([type=hidden]),[contenteditable=true]')).map(function(e){return{tag:e.tagName,type:e.type||'',placeholder:e.placeholder||'',disabled:e.disabled}});const dynEls=Array.from(document.querySelectorAll('[class*=response],[class*=message],[class*=turn],[class*=thought]')).map(function(e){return{cls:e.className.split(' ').slice(0,2).join(' '),len:(e.textContent||'').length}});return JSON.stringify({url:location.href,title:document.title,inputs:i,buttons:b,bodySnippet:(document.body?.innerText||'').substring(0,2000),dynEls:dynEls,timestamp:Date.now()})})())"#,
-    ).await;
+    let (scan_raw, _) = kimi.eval_js(SCAN_JS).await;
     let parsed: serde_json::Value =
         serde_json::from_str(&scan_raw).unwrap_or(serde_json::Value::String(scan_raw.clone()));
     let to_save = if parsed.is_string() {
@@ -187,7 +204,15 @@ async fn do_meta_save(kimi: &KimiPrimitives, name: &str) -> CmdResult {
     } else {
         scan_raw
     };
-    let pretty: serde_json::Value = serde_json::from_str(&to_save)?;
+    let mut pretty: serde_json::Value = serde_json::from_str(&to_save)?;
+    if structural {
+        // Strip volatile fields so the file has a stable diff for version control.
+        if let Some(obj) = pretty.as_object_mut() {
+            obj.remove("bodySnippet");
+            obj.remove("dynEls");
+            obj.remove("timestamp");
+        }
+    }
     std::fs::write(&path, serde_json::to_string_pretty(&pretty)?)?;
     Ok(format!("saved to {}", path.display()))
 }
@@ -202,9 +227,7 @@ async fn do_meta_diff(kimi: &KimiPrimitives, name: &str) -> CmdResult {
         &std::fs::read_to_string(&path)
             .map_err(|_| format!("snapshot '{}' not found at {}", name, path.display()))?,
     )?;
-    let (new_raw, _) = kimi.eval_js(
-        r#"JSON.stringify((()=>{const b=Array.from(document.querySelectorAll('button,[role=button],[role=radio],[role=switch],[role=tab]')).map(function(e){return{text:(e.textContent||'').trim().replace(/\s+/g,' ').substring(0,60),role:e.getAttribute('role')||e.tagName.toLowerCase(),checked:e.getAttribute('aria-checked')||e.getAttribute('aria-pressed')||'',disabled:e.disabled}}).filter(function(b){return b.text.length>0});const i=Array.from(document.querySelectorAll('textarea,input:not([type=hidden]),[contenteditable=true]')).map(function(e){return{tag:e.tagName,type:e.type||'',placeholder:e.placeholder||'',disabled:e.disabled}});const dynEls=Array.from(document.querySelectorAll('[class*=response],[class*=message],[class*=turn],[class*=thought]')).map(function(e){return{cls:e.className.split(' ').slice(0,2).join(' '),len:(e.textContent||'').length}});return JSON.stringify({url:location.href,title:document.title,inputs:i,buttons:b,bodySnippet:(document.body?.innerText||'').substring(0,2000),dynEls:dynEls,timestamp:Date.now()})})())"#,
-    ).await;
+    let (new_raw, _) = kimi.eval_js(SCAN_JS).await;
     let new_parsed: serde_json::Value =
         serde_json::from_str(&new_raw).unwrap_or(serde_json::Value::String(new_raw.clone()));
     let new_str = if new_parsed.is_string() {
@@ -305,7 +328,11 @@ async fn do_meta_diff(kimi: &KimiPrimitives, name: &str) -> CmdResult {
             }
         }
     }
-    if new_dyn.len() != old_dyn.len() {
+    // Only diff volatile fields (dynEls/body) when the baseline snapshot
+    // actually captured them. Structural snapshots (from `save-structure`)
+    // omit these on purpose, so comparing against live data would always
+    // report spurious changes.
+    if old.get("dynEls").is_some() && new_dyn.len() != old_dyn.len() {
         out.push_str(&format!(
             "  Δ dynamic elements: {} → {}\n",
             old_dyn.len(),
@@ -324,7 +351,7 @@ async fn do_meta_diff(kimi: &KimiPrimitives, name: &str) -> CmdResult {
             }
         }
     }
-    if old_body != new_body {
+    if old.get("bodySnippet").is_some() && old_body != new_body {
         let old_words: std::collections::HashSet<&str> = old_body.split(' ').collect();
         let new_words: std::collections::HashSet<&str> = new_body.split(' ').collect();
         let new_wc: Vec<_> = new_words.difference(&old_words).collect();

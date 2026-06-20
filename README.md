@@ -92,10 +92,25 @@ ds x links <tweet_url>
 
 # Meta (page inspection)
 ds meta scan
-ds meta save my-page
-ds meta diff my-page
+ds meta save my-page                      # full snapshot (debugging: includes body text + timestamp)
+ds meta save-structure my-baseline        # structural snapshot (regression baseline: url/title/inputs/buttons only)
+ds meta diff my-baseline                  # detect DOM drift since the snapshot
 ds meta watch 500x20
 ```
+
+### Structural snapshots for regression baselines
+
+`meta save-structure` stores only stable fields (url, title, inputs' placeholder/disabled,
+buttons' text/role/checked) — no `timestamp`, `bodySnippet`, or `dynEls`. This makes the
+file reproducible across repeated saves (zero diff when the page hasn't changed), so it is
+safe to commit to version control as a regression baseline for detecting site redesigns.
+
+**Suitable for tracking** (low churn, stable structure): `deepseek`, `grok`, `gemini`,
+`aistudio`. When one of these ships a redesign that renames a selector, `meta diff <name>`
+will flag the added/removed buttons so you know which adapter to fix.
+
+**Never track** (time-sensitive content): `livenews`, `wallstreet` — their DOM is correct but
+the body text changes every refresh; use the full `meta save` locally for debugging those.
 
 ## Project Structure
 
