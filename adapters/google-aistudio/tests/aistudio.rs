@@ -402,17 +402,19 @@ async fn send_prompt_succeeds_when_user_turn_appears() {
             return json!({"value": n.to_string()});
         }
         // DomState::read JSON snapshot — must carry the filled text so the
-        // fill_and_verify predicate (textarea_value == "hello") passes.
+        // fill_and_verify predicate (extra == "hello") passes.  The extra field
+        // is the prompt-box value (read via extra_js), because the generic
+        // textarea_value only reads the first textarea (system instructions).
         if code.contains("JSON.stringify") {
             return eval_value(
                 &json!({
-                    "textarea_value": "hello",
+                    "textarea_value": "",       // first textarea (system inst.)
                     "user_turn_count": 1,
                     "model_turn_count": 0,
                     "url": "https://aistudio.google.com/prompts/new_chat",
                     "title": "",
                     "is_streaming": false,
-                    "extra": null
+                    "extra": "hello"            // the PROMPT box value
                 })
                 .to_string(),
             );

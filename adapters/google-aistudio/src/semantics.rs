@@ -190,19 +190,30 @@ impl AistudioSemantics {
         // ── OBSERVE: baseline state ──
         let before_count = self.user_turn_count().await;
 
-        // ── ACT + VERIFY: fill, and prove the text landed before clicking Run.
-        // Uses the VerifyDriven trait — a failed fill returns VerifyFailed with
-        // a before/after diff rather than a silent Ok(()). This is the codified
-        // "禁止不验证就进入下一步" rule.
+        // ── ACT + VERIFY: fill the PROMPT box (not the system-instructions box),
+        // and prove the text landed before clicking Run.  The page has TWO
+        // textareas; the first is system instructions, the second is the actual
+        // prompt input.  DomState::textarea_value is HARDCODED to the first
+        // textarea (see verify.rs line 99), so the VERIFY reads the precise
+        // prompt box via extra_js — matching the fill target exactly.
         use pilot::verify::VerifyDriven;
+        let prompt_sel = r#"textarea[placeholder*="Start typing"]"#;
+        let extra_js = concat!(
+            r#"(()=>{const ta=document.querySelector('textarea[placeholder*="Start typing"]');"#,
+            r#"return ta?(ta.value||''):'';})()"#,
+        );
         if self
-            .fill_and_verify("textarea", text, None, |after| after.textarea_value == text)
+            .fill_and_verify(prompt_sel, text, Some(extra_js), |after| {
+                after.extra.as_str().map(|s| s == text).unwrap_or(false)
+            })
             .await
             .is_err()
         {
             // Fallback: retry once (the form may need focus first).
-            self.fill_and_verify("textarea", text, None, |after| after.textarea_value == text)
-                .await?;
+            self.fill_and_verify(prompt_sel, text, Some(extra_js), |after| {
+                after.extra.as_str().map(|s| s == text).unwrap_or(false)
+            })
+            .await?;
         }
         tokio::time::sleep(Duration::from_millis(300)).await;
 
@@ -225,13 +236,14 @@ impl AistudioSemantics {
             return Ok(());
         }
 
-        // Fallback 2: dispatch Enter on the textarea.
+        // Fallback 2: dispatch Enter on the PROMPT textarea (not the system-
+        // instructions box). Using the precise selector matches the fill step.
         debug!("no new user turn after Run retry, dispatching Enter");
         let _ = self
             .kimi
             .eval_js(
                 r#"(() => {
-                const ta = document.querySelector('textarea');
+                const ta = document.querySelector('textarea[placeholder*="Start typing"]');
                 if (!ta) return;
                 ta.dispatchEvent(new KeyboardEvent('keydown', {
                     key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
@@ -1226,13 +1238,20 @@ impl AistudioSemantics {
     }
 
     /// Set the thinking level (Low/Medium/High).
+    ///
+    /// OBSERVE → ACT → VERIFY:
+    /// 1. Target the `mat-select[aria-label="Thinking Level"]` control (not the
+    ///    prompt-template selector that comes first in the DOM).
+    /// 2. Open it, click the matching `mat-option`.
+    /// 3. Re-read `.mat-mdc-select-min-line` from the Thinking Level select and
+    ///    confirm the value was actually applied.
     pub async fn set_thinking_level(&self, level: &str) -> Result<()> {
         let escaped = level.replace('\\', "\\\\").replace('\'', "\\'");
         let code = format!(
             r#"(() => {{
-                const select = document.querySelector('mat-select, [role=combobox]');
-                if (!select) return 'no_select';
-                select.click();
+                const sel = document.querySelector('mat-select[aria-label="Thinking Level"]');
+                if (!sel) return 'no_select';
+                sel.click();
                 setTimeout(() => {{
                     const options = document.querySelectorAll('mat-option, [role=option]');
                     for (const opt of options) {{
@@ -1248,10 +1267,30 @@ impl AistudioSemantics {
         let (result, _) = self.kimi.eval_js(&code).await;
         if result.contains("no_select") {
             return Err(AdapterError::ElementNotFound {
-                selector: "thinking level selector".into(),
+                selector: "mat-select[aria-label=\"Thinking Level\"]".into(),
             });
         }
         tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // ── VERIFY ──────────────────────────────────────────────────────────
+        // Re-read the Thinking Level select's current value from the
+        // `.mat-mdc-select-min-line` display element (per AGENTS.md the
+        // correct VERIFY probe for a mat-select control).
+        let verify_code = r#"(() => {
+            const sel = document.querySelector('mat-select[aria-label="Thinking Level"]');
+            if (!sel) return '';
+            const line = sel.querySelector('.mat-mdc-select-min-line');
+            return line ? line.textContent.trim() : '';
+        })()"#;
+        let (actual, _) = self.kimi.eval_js(verify_code).await;
+        let actual = actual.trim();
+        if actual != level {
+            return Err(AdapterError::VerifyFailed {
+                action: "set_thinking_level".into(),
+                reason: format!("expected Thinking Level '{}', got '{}'", level, actual),
+            });
+        }
+        debug!("Thinking Level set to '{}' (verified)", level);
         Ok(())
     }
 
