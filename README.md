@@ -8,7 +8,6 @@ Multi-adapter browser automation CLI for interacting with web AI platforms and s
 
 - [Kimi WebBridge](https://kimi.com/features/webbridge) browser extension installed and running at `http://127.0.0.1:10086`
 - [Rust](https://rustup.rs/) (edition 2024)
-- **An active browser tab.** WebBridge's `evaluate` channel requires at least one open tab; commands return `HTTP 502` when the browser has no tabs. Run `ds raw navigate https://example.com` once to activate it if `ds status` says connected but `ds raw url` returns 502.
 
 ## Quick Start
 
@@ -34,7 +33,7 @@ cargo run -- meta scan
 | `wallstreet` | wallstreetcn.com | Extract articles, search, article body extraction |
 | `livenews` | wallstreetcn.com/live/global | Extract live news items, filter by category, important-only toggle, polling |
 | `google` | google.com | Web/image/video/news/shopping/forums/books/AI search, pagination, time filters, snippets |
-| `aistudio` | aistudio.google.com | Send prompts, extract responses, select model, set thinking level, browse history, get API code, extract full conversation, system instructions, tool toggles, temperature, reasoning, page state |
+| `aistudio` | aistudio.google.com | Send prompts, extract responses/conversation, select model, thinking level, system instructions, tool toggles, temperature, get API code |
 | `x` | x.com | Extract tweet threads (main tweet + self-replies), external links, engagement stats |
 
 ## Usage
@@ -72,31 +71,14 @@ ds google search news climate change
 ds google next
 ds google recent "rust lang" h
 
-# AI Studio
-ds aistudio send "Write a Python hello world"
-ds aistudio ask "Write a Python hello world"   # send + wait + extract (atomic)
-ds aistudio wait
-ds aistudio extract                              # latest model reply only
-ds aistudio turns                                # full conversation, one turn per block
-ds aistudio conversation                         # full conversation as plain text
-ds aistudio state                                # page snapshot (url/input/streaming/turn counts)
+# AI Studio (run `ds aistudio` with no args to list all subcommands)
+ds aistudio ask "Write a Python hello world"   # send + wait + extract (atomic, auto-reruns on failure)
 ds aistudio model pro
 ds aistudio thinking low
-ds aistudio system "Be concise and cite sources"
+ds aistudio system "Be concise"
 ds aistudio tool search                          # toggle Grounding with Google Search
-ds aistudio temp 0.7
-ds aistudio reasoning                            # latest thinking content (Pro models)
-ds aistudio runtime                              # run-time pill for last response (e.g. 3.9s)
-ds aistudio rerun                                # manually rerun the last turn on failure
-ds aistudio rate up                              # feedback on last response (up|good|down|bad)
-ds aistudio share                                # open Share dialog + print the share link
-ds aistudio history 10
-ds aistudio code
-# NOTE: `ask` is resilient — if generation fails (no reply), it auto-clicks
-# "Rerun this turn" up to 3 times before giving up. `send` is fire-and-forget.
-# Content extraction (extract/turns/conversation) reads `.text-chunk` nodes,
-# which AI Studio virtualizes out of the DOM non-deterministically. If you get
-# "(content not rendered)", scroll the chat in the browser and retry.
+ds aistudio turns                                # full conversation
+ds aistudio code                                 # get API code for the current prompt
 
 # Bilibili
 ds bilibili search "Rust tutorial"
@@ -117,17 +99,11 @@ ds meta watch 500x20
 
 ### Structural snapshots for regression baselines
 
-`meta save-structure` stores only stable fields (url, title, inputs' placeholder/disabled,
-buttons' text/role/checked) — no `timestamp`, `bodySnippet`, or `dynEls`. This makes the
-file reproducible across repeated saves (zero diff when the page hasn't changed), so it is
-safe to commit to version control as a regression baseline for detecting site redesigns.
-
-**Suitable for tracking** (low churn, stable structure): `deepseek`, `grok`, `gemini`,
-`aistudio`. When one of these ships a redesign that renames a selector, `meta diff <name>`
-will flag the added/removed buttons so you know which adapter to fix.
-
-**Never track** (time-sensitive content): `livenews`, `wallstreet` — their DOM is correct but
-the body text changes every refresh; use the full `meta save` locally for debugging those.
+`meta save-structure` stores only stable fields (url/title/inputs/buttons), so the file is
+reproducible and safe to commit as a baseline for detecting site redesigns via `meta diff`.
+Use it on low-churn sites (`deepseek`, `grok`, `gemini`, `aistudio`); avoid it on time-sensitive
+ones (`livenews`, `wallstreet`) whose body text changes every refresh — use the full `meta save`
+locally for those.
 
 ## Project Structure
 
@@ -166,8 +142,17 @@ make clean-system  # Clean ~/.cargo cache (stale crate sources)
 1. Create `knowledge/<domain>.yaml` documenting the site's DOM structure, APIs, and pitfalls
 2. Create `adapters/<name>/` with `Cargo.toml`, `src/lib.rs`, `src/models.rs`, `src/semantics.rs`
 3. Add the crate to `Cargo.toml` workspace members and `cli/Cargo.toml` dependencies
-4. Create `cli/src/handlers/<name>.rs` exposing `pub async fn handle(session, arg) -> CmdResult`, declare it in `cli/src/handlers/mod.rs`, and register it in `registry()` in `cli/src/main.rs`
+4. Wire up the CLI handler:
+   - Create `cli/src/handlers/<name>.rs` exposing `pub async fn handle(session, arg) -> CmdResult`
+   - Declare it in `cli/src/handlers/mod.rs`
+   - Register it in `registry()` in `cli/src/main.rs`
 5. Build with `cargo build` and test against the live site
+
+## Troubleshooting
+
+- **`ds raw url` returns HTTP 502 while `ds status` says connected** — WebBridge's `evaluate`
+  channel needs at least one open browser tab. Run `ds raw navigate https://example.com` once
+  to activate it.
 
 ## License
 
