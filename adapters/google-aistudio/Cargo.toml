@@ -10,3 +10,6 @@ pilot = { path = "../../pilot" }
 tokio.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
+
+[dev-dependencies]
+wiremock = "0.6"

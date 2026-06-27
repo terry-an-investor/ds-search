@@ -15,7 +15,17 @@
 #    - Prompt input: textarea (placeholder="Start typing a prompt to see what our models can do")
 #    - Run button: button containing "Run" text — triggers GenerateContent
 #    - Model selector: button.model-selector-card — opens model selection dialog
+#      IMPORTANT (verified live 2026-06-26): the card's textContent mixes the
+#      name, ID, and a marketing blurb. The model NAME lives in a child span with
+#      class "title"; the ID in a span with class "subtitle". Read .title to get
+#      the clean name (e.g. "Gemini 3.5 Flash"), not the card's full text.
 #    - System instructions: textarea for optional tone/style instructions
+#      IMPORTANT (verified live 2026-06-26): the system-instructions field is
+#      collapsible. When collapsed (default) there is NO textarea — only a button
+#      whose text starts with "System instructions". Click it to expand. When
+#      expanded, the field renders ABOVE the prompt input (textarea index 0), so
+#      a positional "second textarea" selector is WRONG. Locate it by its
+#      placeholder: "Optional tone and style instructions for the model".
 #    - Temperature: slider control
 #    - Thinking level: mat-select combobox (Low/Medium/High)
 #    - Tools toggles: Structured outputs, Code execution, Function calling,
@@ -56,9 +66,59 @@
 #
 # 5. Response rendering
 #    - Angular virtual scroll: .virtual-scroll-container with .turn-content (initially empty)
-#    - Response text rendered via Angular components, visible in body.innerText
+#    - Response text rendered via Angular components, visible in document.body.innerText
 #    - After response: H1 title updates to a generated title (e.g., "Hello, World!")
 #    - Extraction: use document.body.innerText, look for text between user prompt and footer
+#
+#    IMPORTANT (verified live 2026-06-26 via meta scan + curl probes):
+#    - .chat-turn-container textContent is NOT the conversation. It mixes in UI
+#      chrome (the .author-label "Model 10:39 PM" header, thumb_up/down, run-time pill).
+#    - The authoritative content node is MS-PROMPT-CHUNK.text-chunk (one per
+#      paragraph). Read it directly — do NOT scrape container.textContent and
+#      strip the timestamp with regex (the timestamp uses U+202F narrow no-break
+#      space before AM/PM; locale/format drift will silently break a regex).
+#    - .virtual-scroll-container text is ABSENT until the turn is scrollIntoView'd.
+#      Always scrollIntoView each .chat-turn-container before reading its content.
+#    - VIRTUAL SCROLL IS NON-DETERMINISTIC: a single scrollIntoView does NOT
+#      guarantee remount. `.turn-content` can stay empty (`<!---->`) even after
+#      scrolling because Angular CDK's internal viewport bookkeeping may still
+#      consider the turn off-screen. The adapter retries (scroll + delay ×4);
+#      this works in practice but is not 100% reliable. There is no JS-only way
+#      to force a remount. (Confirmed: `pong` turn mounted on first try on one
+#      page state, but a fresh 2-turn conversation needed the retry loop.)
+#    - When "Thinking" is enabled (Medium/High), the model's reasoning renders
+#      as its OWN `.text-chunk` (prefixed "Thoughts ...") INSIDE the model turn,
+#      before the final answer chunk. Filtering thoughts from the answer requires
+#      per-content-type handling (plain text vs code block vs thoughts), which
+#      the adapter does not yet do — callers may see both in extract_turns().
+#    - Code-block answers carry UI chrome text inside the same .text-chunk
+#      ("code JSON download content_copy expand_less" before the code body).
+#    - document.body.innerText does NOT contain the conversation at all on modern
+#      AI Studio (the turns live in the virtualized layer). The legacy body-text
+#      extraction approach is obsolete.
+#    - Run-time pill (.model-run-time-pill, e.g. "3.7s" or "1m3.8s") is the
+#      authoritative "generation finished" signal. The page keeps a passive
+#      .loading-token-count-placeholder element around after completion, so
+#      [class*=loading] is NOT a reliable "is streaming" indicator — use
+#      .mat-progress-spinner / [role=progressbar] / [aria-busy=true] instead.
+#
+# 5b. Generation resilience (verified live 2026-06-26)
+#    - AI Studio generation frequently fails (network blip, rate limit, model
+#      error). A failed turn has NO run-time pill and/or shows an error string
+#      ("Try again" / "Something went wrong" / "An error occurred").
+#    - Each model turn carries a rerun button: [name="rerun-button"] /
+#      [aria-label="Rerun this turn"]. Clicking it re-runs generation.
+#    - The adapter's send_and_wait / ask retries by clicking rerun (up to 3x)
+#      when check_generation_error() detects a failure.
+#
+# 5c. Per-turn action buttons (verified live 2026-06-26)
+#    - Feedback: [aria-label="Good response"] (thumb_up) /
+#      [aria-label="Bad response"] (thumb_down), with aria-pressed state.
+#    - Share: top-bar [aria-label="Share prompt"] opens a share dialog that
+#      mounts as [role=dialog] directly under <body> (NOT a .cdk-overlay-pane).
+#      Link creation is asynchronous — the dialog shows "正在加载…" until the
+#      backend mints the URL; it may not complete (platform/account-dependent).
+#    - Get code: top-bar "code Get code" button opens a .cdk-overlay-pane modal.
 #
 # 6. History page (/library)
 #    - Tabs: All | My files | Shared | drive

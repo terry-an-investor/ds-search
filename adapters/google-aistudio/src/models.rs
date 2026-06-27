@@ -71,3 +71,147 @@ impl AistudioModel {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+// Conversation extraction
+// ═══════════════════════════════════════════════════════════
+
+/// Role of a chat turn in an AI Studio conversation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TurnRole {
+    User,
+    Model,
+}
+
+impl TurnRole {
+    pub fn as_label(&self) -> &'static str {
+        match self {
+            TurnRole::User => "user",
+            TurnRole::Model => "model",
+        }
+    }
+}
+
+/// A single chat turn (user prompt or model response).
+#[derive(Debug, Clone)]
+pub struct ChatTurn {
+    pub role: TurnRole,
+    pub content: String,
+}
+
+/// A full AI Studio conversation extracted from a /prompts/<id> page.
+#[derive(Debug, Clone)]
+pub struct Conversation {
+    pub title: String,
+    pub url: String,
+    pub turns: Vec<ChatTurn>,
+}
+
+// ═══════════════════════════════════════════════════════════
+// Playground tools
+// ═══════════════════════════════════════════════════════════
+
+/// Toggleable Playground tools (knowledge/aistudio.google.com.yaml §2).
+///
+/// `as_label()` returns the substring used to match the tool's button text;
+/// `from_label()` accepts the short CLI name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tool {
+    /// "Structured outputs" toggle.
+    StructuredOutputs,
+    /// "Code execution" toggle.
+    CodeExecution,
+    /// "Function calling" toggle.
+    FunctionCalling,
+    /// "Grounding with Google Search".
+    GoogleSearchGrounding,
+    /// "Grounding with Google Maps".
+    MapsGrounding,
+    /// "URL context" toggle.
+    UrlContext,
+}
+
+impl Tool {
+    /// Button-text substring used to locate the tool on the page.
+    pub fn as_label(&self) -> &'static str {
+        match self {
+            Tool::StructuredOutputs => "Structured outputs",
+            Tool::CodeExecution => "Code execution",
+            Tool::FunctionCalling => "Function calling",
+            Tool::GoogleSearchGrounding => "Grounding with Google Search",
+            Tool::MapsGrounding => "Grounding with Google Maps",
+            Tool::UrlContext => "URL context",
+        }
+    }
+
+    /// Parse from CLI argument (case-insensitive).
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "structured" | "structured-outputs" | "structuredoutputs" => {
+                Some(Tool::StructuredOutputs)
+            }
+            "code" | "code-execution" => Some(Tool::CodeExecution),
+            "function" | "function-calling" => Some(Tool::FunctionCalling),
+            "search" | "google-search" | "grounding" => Some(Tool::GoogleSearchGrounding),
+            "maps" | "google-maps" => Some(Tool::MapsGrounding),
+            "url" | "url-context" | "urlcontext" => Some(Tool::UrlContext),
+            _ => None,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Thinking level (typed)
+// ═══════════════════════════════════════════════════════════
+
+/// Reasoning depth for models that support it (Low/Medium/High).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThinkingLevel {
+    Low,
+    Medium,
+    High,
+}
+
+impl ThinkingLevel {
+    pub fn as_label(&self) -> &'static str {
+        match self {
+            ThinkingLevel::Low => "Low",
+            ThinkingLevel::Medium => "Medium",
+            ThinkingLevel::High => "High",
+        }
+    }
+
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "low" => Some(ThinkingLevel::Low),
+            "medium" => Some(ThinkingLevel::Medium),
+            "high" => Some(ThinkingLevel::High),
+            _ => None,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Lightweight page state & response stats
+// ═══════════════════════════════════════════════════════════
+
+/// Single-eval snapshot of the playground page (mirrors grok::get_state).
+#[derive(Debug, Clone, Default)]
+pub struct AistudioState {
+    pub url: String,
+    pub is_on_playground: bool,
+    pub has_input: bool,
+    pub is_streaming: bool,
+    pub user_turn_count: usize,
+    pub model_turn_count: usize,
+    pub current_model: String,
+}
+
+/// Metrics shown after a model turn: runtime pill + token count.
+#[derive(Debug, Clone, Default)]
+pub struct PromptStats {
+    /// e.g. "3.9s" from `.model-run-time-pill`, if present.
+    pub runtime: Option<String>,
+    /// Token-count string if surfaced on the page.
+    pub token_count: Option<String>,
+}

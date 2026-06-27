@@ -34,7 +34,7 @@ cargo run -- meta scan
 | `wallstreet` | wallstreetcn.com | Extract articles, search, article body extraction |
 | `livenews` | wallstreetcn.com/live/global | Extract live news items, filter by category, important-only toggle, polling |
 | `google` | google.com | Web/image/video/news/shopping/forums/books/AI search, pagination, time filters, snippets |
-| `aistudio` | aistudio.google.com | Send prompts, extract responses, select model, set thinking level, browse history, get API code |
+| `aistudio` | aistudio.google.com | Send prompts, extract responses, select model, set thinking level, browse history, get API code, extract full conversation, system instructions, tool toggles, temperature, reasoning, page state |
 | `x` | x.com | Extract tweet threads (main tweet + self-replies), external links, engagement stats |
 
 ## Usage
@@ -74,12 +74,29 @@ ds google recent "rust lang" h
 
 # AI Studio
 ds aistudio send "Write a Python hello world"
+ds aistudio ask "Write a Python hello world"   # send + wait + extract (atomic)
 ds aistudio wait
-ds aistudio extract
+ds aistudio extract                              # latest model reply only
+ds aistudio turns                                # full conversation, one turn per block
+ds aistudio conversation                         # full conversation as plain text
+ds aistudio state                                # page snapshot (url/input/streaming/turn counts)
 ds aistudio model pro
 ds aistudio thinking low
+ds aistudio system "Be concise and cite sources"
+ds aistudio tool search                          # toggle Grounding with Google Search
+ds aistudio temp 0.7
+ds aistudio reasoning                            # latest thinking content (Pro models)
+ds aistudio runtime                              # run-time pill for last response (e.g. 3.9s)
+ds aistudio rerun                                # manually rerun the last turn on failure
+ds aistudio rate up                              # feedback on last response (up|good|down|bad)
+ds aistudio share                                # open Share dialog + print the share link
 ds aistudio history 10
 ds aistudio code
+# NOTE: `ask` is resilient — if generation fails (no reply), it auto-clicks
+# "Rerun this turn" up to 3 times before giving up. `send` is fire-and-forget.
+# Content extraction (extract/turns/conversation) reads `.text-chunk` nodes,
+# which AI Studio virtualizes out of the DOM non-deterministically. If you get
+# "(content not rendered)", scroll the chat in the browser and retry.
 
 # Bilibili
 ds bilibili search "Rust tutorial"

@@ -25,6 +25,13 @@ pub enum AdapterError {
 
     #[error("No response extracted")]
     NoResponse,
+
+    /// An ACT completed (HTTP-level success) but the post-action VERIFY read of
+    /// the DOM did not confirm the intended change. See `pilot::verify`. The
+    /// `reason` carries the before/after diff so the caller can decide whether
+    /// to retry with a different strategy or surface the failure.
+    #[error("VERIFY failed after '{action}': {reason}")]
+    VerifyFailed { action: String, reason: String },
 }
 
 impl From<&str> for AdapterError {
