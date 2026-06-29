@@ -3,7 +3,7 @@
 //! Maps to the Python `DeepSeekSemantics` class. All page interactions
 //! (send, extract, toggle, mode switch, logging) happen here.
 
-use crate::models::{BrowserLogEntry, ChatMode, FastState, Feature};
+use crate::models::{BrowserLogEntry, ChatMode, ChatTurn, FastState, Feature, ThinkingTrace};
 use pilot::error::{AdapterError, Result};
 use pilot::kimi::KimiPrimitives;
 use std::time::Duration;
@@ -595,6 +595,238 @@ impl DeepSeekSemantics {
         false
     }
 
+    // ── Turn extraction (full conversation) ──
+
+    /// Extract the full multi-turn conversation as paired user+assistant turns.
+    ///
+    /// Scrolls the virtual list and retries until the `.ds-message` count stabilizes
+    /// (DeepSeek lazy-unmounts off-screen messages, same as AI Studio). Each `.ds-message`
+    /// is classified by the hash-class heuristic: hash-prefixed class = user, otherwise = assistant.
+    /// Consecutive user+assistant messages are paired into a ChatTurn; a trailing unpaired
+    /// user message (e.g. sent but no reply yet) is included with an empty response.
+    pub async fn extract_turns(&self) -> Vec<ChatTurn> {
+        let mut prev_count = 0usize;
+        let mut raw_msgs: Vec<serde_json::Value> = Vec::new();
+
+        for _attempt in 0..4 {
+            self.scroll_virtual_list().await;
+            tokio::time::sleep(Duration::from_millis(300)).await;
+
+            let data = self
+                .kimi
+                .eval_json(
+                    r#"
+(() => {
+    const msgs = document.querySelectorAll('.ds-message');
+    return JSON.stringify(Array.from(msgs).map(msg => {
+        const classes = (msg.className || '').split(/\s+/).filter(Boolean);
+        const hasHash = classes.some(c => /^d[0-9a-f]{7,}$/i.test(c));
+        if (hasHash) {
+            // User message
+            const bubble = msg.querySelector('[class*="fbb737a4"]');
+            return {
+                role: 'user',
+                content: ((bubble || msg).textContent || '').trim().substring(0, 20000),
+                think: '',
+                think_secs: ''
+            };
+        } else {
+            // Assistant message
+            const main = msg.querySelector('.ds-markdown.ds-assistant-message-main-content');
+            let content = main ? main.textContent.trim() : '';
+            if (!content) {
+                content = Array.from(msg.querySelectorAll('.ds-markdown'))
+                    .filter(el => !el.closest('.ds-think-content'))
+                    .map(el => el.textContent.trim())
+                    .join('\n').trim();
+            }
+            const thinkEl = msg.querySelector('.ds-think-content');
+            let think = '';
+            let thinkSecs = '';
+            if (thinkEl) {
+                think = Array.from(thinkEl.querySelectorAll('.ds-markdown'))
+                    .map(md => md.textContent.trim())
+                    .join('\n');
+                const fullText = msg.textContent || '';
+                const tm = fullText.match(/已思考[（(]用时\s*(\d+)\s*秒[）)]/);
+                if (tm) thinkSecs = tm[1];
+            }
+            return {
+                role: 'assistant',
+                content: content.substring(0, 20000),
+                think: think.substring(0, 20000),
+                think_secs: thinkSecs
+            };
+        }
+    }));
+})()
+"#,
+                )
+                .await;
+
+            let current = match &data {
+                Some(v) => v.as_array().map(|a| a.clone()).unwrap_or_default(),
+                None => vec![],
+            };
+
+            if current.len() == prev_count && !current.is_empty() {
+                raw_msgs = current;
+                break;
+            }
+            prev_count = current.len();
+            raw_msgs = current;
+        }
+
+        // Pair consecutive user→assistant messages into ChatTurn
+        let mut turns: Vec<ChatTurn> = Vec::new();
+        let mut i = 0;
+        while i < raw_msgs.len() {
+            let role = raw_msgs[i]
+                .get("role")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let content = raw_msgs[i]
+                .get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            if role == "user" {
+                // Check if next message is assistant
+                if i + 1 < raw_msgs.len() {
+                    let next_role = raw_msgs[i + 1]
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if next_role == "assistant" {
+                        let resp = raw_msgs[i + 1]
+                            .get("content")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let think = extract_thinking_trace(&raw_msgs[i + 1]);
+                        turns.push(ChatTurn {
+                            user_message: content,
+                            assistant_response: resp,
+                            thinking_trace: think,
+                            timestamp: 0.0,
+                        });
+                        i += 2;
+                        continue;
+                    }
+                }
+                // Unpaired user message (no following assistant)
+                turns.push(ChatTurn {
+                    user_message: content,
+                    assistant_response: String::new(),
+                    thinking_trace: None,
+                    timestamp: 0.0,
+                });
+                i += 1;
+            } else {
+                // Orphan assistant message (shouldn't happen, be defensive)
+                turns.push(ChatTurn {
+                    user_message: String::new(),
+                    assistant_response: content,
+                    thinking_trace: None,
+                    timestamp: 0.0,
+                });
+                i += 1;
+            }
+        }
+
+        debug!(turn_count = turns.len(), "extract_turns done");
+        turns
+    }
+
+    // ── Session navigation ──
+
+    /// Open a historical conversation by session URL or sidebar title.
+    ///
+    /// If `query` contains "/a/chat/s/", treat it as a URL and navigate directly.
+    /// Otherwise, fuzzy-match it against the sidebar history titles (a[href*="/a/chat/s/"])
+    /// and click the first match. Waits for the virtual list to re-hydrate before returning.
+    pub async fn open_session(&self, query: &str) -> Result<()> {
+        if query.contains("/a/chat/s/") {
+            let url = if query.starts_with('/') {
+                format!("https://chat.deepseek.com{}", query)
+            } else {
+                query.to_string()
+            };
+            debug!(url = %url, "navigating to session URL");
+            self.kimi.navigate(&url, false).await?;
+        } else {
+            let query_lower = query.to_lowercase();
+            let safe = serde_json::to_string(&query_lower)?;
+            let (found, _) = self
+                .kimi
+                .eval_js(&format!(
+                    r#"(() => {{
+                    const links = document.querySelectorAll('a[href*="/a/chat/s/"]');
+                    for (const a of links) {{
+                        if (a.textContent.trim().toLowerCase().includes({})) {{
+                            a.click();
+                            return true;
+                        }}
+                    }}
+                    return false;
+                }})()"#,
+                    safe
+                ))
+                .await;
+            if found != "true" {
+                return Err(AdapterError::ElementNotFound {
+                    selector: format!("history item matching '{}'", query),
+                });
+            }
+            debug!(query = %query, "clicked sidebar history item");
+        }
+
+        // VERIFY 1: URL should now contain /a/chat/s/
+        let mut url_ok = false;
+        for _ in 0..30 {
+            let url = self.kimi.get_url().await;
+            if url.contains("/a/chat/s/") {
+                url_ok = true;
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        if !url_ok {
+            warn!("open_session: URL never settled to /a/chat/s/");
+            return Err(AdapterError::PageNotReady {
+                reason: "session URL did not settle".into(),
+            });
+        }
+
+        // VERIFY 2: wait for virtual list to hydrate
+        for _ in 0..20 {
+            let (ready, _) = self
+                .kimi
+                .eval_js(
+                    r#"(() => {
+                    const vl = document.querySelector('.ds-virtual-list');
+                    const msgs = document.querySelectorAll('.ds-message').length;
+                    const ta = !!document.querySelector('textarea');
+                    if (vl && msgs > 0) return 'ready';
+                    if (ta) return 'ready';
+                    return 'waiting';
+                })()"#,
+                )
+                .await;
+            if ready == "ready" {
+                debug!("open_session: session hydrated");
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        warn!("open_session: session did not hydrate within timeout");
+        Err(AdapterError::PageNotReady {
+            reason: "session did not hydrate".into(),
+        })
+    }
+
     /// Full send pipeline: send → wait for streaming to settle → extract with
     /// stability confirmation. This is the production-grade send path for
     /// DeepSeek's virtual-list + streaming-render combination, which the bare
@@ -659,4 +891,21 @@ impl From<KimiPrimitives> for DeepSeekSemantics {
     fn from(kimi: KimiPrimitives) -> Self {
         Self::new(kimi)
     }
+}
+
+/// Extract ThinkingTrace from a raw JSON message object.
+fn extract_thinking_trace(v: &serde_json::Value) -> Option<ThinkingTrace> {
+    let think = v.get("think").and_then(|s| s.as_str()).unwrap_or("");
+    if think.is_empty() {
+        return None;
+    }
+    let time = v
+        .get("think_secs")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    Some(ThinkingTrace {
+        content: think.to_string(),
+        time,
+    })
 }

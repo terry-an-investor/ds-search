@@ -47,6 +47,27 @@ response:
   fallback: .ds-message (filter out user messages by hash-prefixed class)
   thinking_selector: .ds-think-content within .ds-message
   extract_order: scroll virtual list first, then query selectors latest-first
+  # Multi-turn extraction (verified live 2026-06-29):
+  # - .ds-message elements appear in conversation order: user, assistant, user, assistant, ...
+  # - Role detection: user messages have a hash-prefixed class matching /^d[0-9a-f]{7,}$/i;
+  #   assistant messages do NOT. This is the stable signal (build-hash classes like fbb737a4
+  #   come and go). The user bubble child has class containing "fbb737a4" (a build hash, unstable).
+  # - Assistant content: .ds-markdown.ds-assistant-message-main-content (fallback: .ds-markdown
+  #   excluding .ds-think-content). Thinking: .ds-think-content with ".ds-markdown" children,
+  #   timestamp regex /已思考[（(]用时\s*(\d+)\s*秒[）)]/.
+  # - VIRTUAL LIST DROPS EARLY MESSAGES: Angular CDK unmounts off-screen .ds-message nodes.
+  #   extract_turns retries (scroll ×4) but cannot force-remount; a long conversation may show
+  #   fewer turns than actually exist. The first user message is often the first to be dropped.
+  #   Real-time messages (just generated) mount reliably; navigate-to-history may initially show
+  #   0 messages until the virtual list hydrates (use open_session which waits for hydration).
+
+# ── History sidebar (verified live 2026-06-29) ──
+history:
+  link_selector: 'a[href*="/a/chat/s/"]'
+  url_pattern: '/a/chat/s/<uuid>'  # directly addressable via navigate
+  title_source: a.textContent      # e.g. "玄麦甘桔颗粒组方解析"
+  match: case-insensitive includes on textContent
+  note: "Clicking a sidebar link navigates within the SPA; navigate(full URL) also works but may need extra hydration time for the virtual list."
 
 # ── Loading indicators ──
 loading:

@@ -26,7 +26,7 @@ cargo run -- meta scan
 
 | Command | Site | Capabilities |
 |---------|------|-------------|
-| `deepseek` | chat.deepseek.com | Send prompts, extract responses/thinking, toggle search/thinking mode, new conversations |
+| `deepseek` | chat.deepseek.com | Send prompts, extract responses/thinking, toggle search/thinking mode, multi-turn extraction, open history sessions, new conversations |
 | `grok` | x.com/i/grok | Send prompts, extract responses, new conversations |
 | `gemini` | gemini.google.com | Send prompts, extract responses/thinking, select model (Fast/Thinking/Pro), stream detection |
 | `bilibili` | bilibili.com | Search videos, extract results (title/duration/uploader), pagination, sort, video details |
@@ -57,9 +57,10 @@ ds --session <name> <command> <subcommand> [args...]
 
 ```bash
 # DeepSeek
-ds deepseek send "Explain Rust ownership"
 ds deepseek ask "Explain Rust ownership"   # send + wait-for-stable + extract (atomic)
-ds deepseek extract
+ds deepseek extract                          # latest model reply only
+ds deepseek turns                            # full multi-turn conversation
+ds deepseek open "Rust ownership chat"       # open a history session by title (or /a/chat/s/<id> URL)
 ds deepseek thinking
 ds deepseek toggle search
 ds deepseek mode expert

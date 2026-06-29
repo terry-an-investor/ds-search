@@ -223,3 +223,121 @@ async fn fast_state_default() {
     assert!(!st.has_input);
     assert_eq!(st.message_count, 0);
 }
+
+// ── extract_turns ──
+
+#[tokio::test]
+async fn extract_turns_pairs_user_assistant() {
+    let m = MockKimi::new().await;
+    let raw = serde_json::json!([
+        {"role": "user", "content": "hello", "think": "", "think_secs": ""},
+        {"role": "assistant", "content": "hi there", "think": "", "think_secs": ""},
+        {"role": "user", "content": "bye", "think": "", "think_secs": ""},
+        {"role": "assistant", "content": "goodbye", "think": "", "think_secs": ""}
+    ]);
+    m.set_eval_response("JSON.stringify", serde_json::json!(raw.to_string()));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let turns = s.extract_turns().await;
+    assert_eq!(turns.len(), 2);
+    assert_eq!(turns[0].user_message, "hello");
+    assert_eq!(turns[0].assistant_response, "hi there");
+    assert_eq!(turns[1].user_message, "bye");
+    assert_eq!(turns[1].assistant_response, "goodbye");
+    // No thinking traces for these messages
+    assert!(turns[0].thinking_trace.is_none());
+    assert!(turns[1].thinking_trace.is_none());
+}
+
+#[tokio::test]
+async fn extract_turns_empty_when_no_messages() {
+    let m = MockKimi::new().await;
+    // Explicitly mock an empty array — no .ds-message elements found.
+    m.set_eval_response("JSON.stringify", serde_json::json!("[]"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let turns = s.extract_turns().await;
+    assert!(turns.is_empty());
+}
+
+#[tokio::test]
+async fn extract_turns_handles_thinking_trace() {
+    let m = MockKimi::new().await;
+    let raw = serde_json::json!([
+        {"role": "user", "content": "hello", "think": "", "think_secs": ""},
+        {"role": "assistant", "content": "some answer", "think": "reasoning here", "think_secs": "6"}
+    ]);
+    m.set_eval_response("JSON.stringify", serde_json::json!(raw.to_string()));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let turns = s.extract_turns().await;
+    assert_eq!(turns.len(), 1);
+    let trace = turns[0].thinking_trace.as_ref();
+    assert!(trace.is_some());
+    let trace = trace.unwrap();
+    assert!(trace.content.contains("reasoning here"));
+    assert_eq!(trace.time, Some("6".to_string()));
+}
+
+#[tokio::test]
+async fn extract_turns_orphan_assistant() {
+    let m = MockKimi::new().await;
+    // First message is assistant (no preceding user) — defensive edge case.
+    let raw = serde_json::json!([
+        {"role": "assistant", "content": "orphan response", "think": "", "think_secs": ""}
+    ]);
+    m.set_eval_response("JSON.stringify", serde_json::json!(raw.to_string()));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let turns = s.extract_turns().await;
+    assert_eq!(turns.len(), 1);
+    assert!(turns[0].user_message.is_empty());
+    assert_eq!(turns[0].assistant_response, "orphan response");
+}
+
+// ── open_session ──
+
+#[tokio::test]
+async fn open_session_by_url_navigates() {
+    let m = MockKimi::new().await;
+    let session_url = "https://chat.deepseek.com/a/chat/s/abc123";
+    // get_url → eval_js("window.location.href") returns the session URL
+    m.set_eval_response("window.location.href", serde_json::json!(session_url));
+    // Hydrate check → eval_js returns "ready"
+    m.set_eval_response(".ds-virtual-list", serde_json::json!("ready"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let result = s.open_session(session_url).await;
+    assert!(result.is_ok(), "navigate path should succeed: {:?}", result);
+}
+
+#[tokio::test]
+async fn open_session_by_title_clicks_sidebar() {
+    let m = MockKimi::new().await;
+    // Sidebar click eval finds a match → returns "true"
+    m.set_eval_response("a[href*=\"/a/chat/s/\"]", serde_json::json!("true"));
+    // URL verify loop
+    m.set_eval_response(
+        "window.location.href",
+        serde_json::json!("https://chat.deepseek.com/a/chat/s/xyz789"),
+    );
+    // Hydrate check
+    m.set_eval_response(".ds-virtual-list", serde_json::json!("ready"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let result = s.open_session("test conversation").await;
+    assert!(
+        result.is_ok(),
+        "sidebar click path should succeed: {:?}",
+        result
+    );
+}
+
+#[tokio::test]
+async fn open_session_title_not_found_errors() {
+    let m = MockKimi::new().await;
+    // Sidebar click eval finds nothing → returns "false"
+    m.set_eval_response("a[href*=\"/a/chat/s/\"]", serde_json::json!("false"));
+    let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
+    let err = s.open_session("nonexistent").await.unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("history item"),
+        "expected error mentioning 'history item', got: {}",
+        msg
+    );
+}

@@ -59,6 +59,24 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
         }
         "button" => format!("send_button_enabled → {}", sem.send_button_enabled().await),
         "scroll" => { sem.scroll_virtual_list().await; "scrolled".into() }
-        _ => return Err("subcommands: state ensure send ask extract thinking toggle mode new error log button scroll".into()),
+        "turns" => {
+            let turns = sem.extract_turns().await;
+            if turns.is_empty() { "(no turns found)".into() } else {
+                let mut out = String::new();
+                for t in &turns {
+                    out.push_str(&format!("[user] {}\n[model] {}\n\n",
+                        t.user_message,
+                        t.assistant_response,
+                    ));
+                }
+                out
+            }
+        }
+        "open" => {
+            if sub_arg.is_empty() { return Err("open requires a session URL or title".into()); }
+            sem.open_session(sub_arg).await?;
+            "opened".into()
+        }
+        _ => return Err("subcommands: state ensure send ask extract thinking toggle mode new error log button scroll turns open".into()),
     })
 }
