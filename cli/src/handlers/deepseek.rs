@@ -63,8 +63,9 @@ pub async fn handle(session: String, arg: String) -> CmdResult {
             let turns = sem.extract_turns().await;
             if turns.is_empty() { "(no turns found)".into() } else {
                 let mut out = String::new();
-                for t in &turns {
-                    out.push_str(&format!("[user] {}\n[model] {}\n\n",
+                for (i, t) in turns.iter().enumerate() {
+                    out.push_str(&format!("--- Turn {} ---\n[user] {}\n[model] {}\n\n",
+                        i + 1,
                         t.user_message,
                         t.assistant_response,
                     ));
