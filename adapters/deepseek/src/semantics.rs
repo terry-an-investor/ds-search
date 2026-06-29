@@ -6,6 +6,7 @@
 use crate::models::{BrowserLogEntry, ChatMode, ChatTurn, FastState, Feature, ThinkingTrace};
 use pilot::error::{AdapterError, Result};
 use pilot::kimi::KimiPrimitives;
+use std::collections::BTreeMap;
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
@@ -605,33 +606,46 @@ impl DeepSeekSemantics {
     /// Consecutive user+assistant messages are paired into a ChatTurn; a trailing unpaired
     /// user message (e.g. sent but no reply yet) is included with an empty response.
     pub async fn extract_turns(&self) -> Vec<ChatTurn> {
-        let mut prev_count = 0usize;
-        let mut raw_msgs: Vec<serde_json::Value> = Vec::new();
+        // ── Fast path: fetch the full conversation via the history API ──
+        // DeepSeek exposes GET /api/v0/chat/history_messages?chat_session_id=<id>
+        // with the userToken from localStorage. This returns ALL messages in one
+        // shot (no virtual-list truncation). Falls back to DOM sweep if the API
+        // is unavailable (not logged in, URL has no session id, API changed).
+        if let Some(turns) = self.extract_turns_via_api().await {
+            return turns;
+        }
 
-        for _attempt in 0..4 {
-            self.scroll_virtual_list().await;
-            tokio::time::sleep(Duration::from_millis(300)).await;
-
-            let data = self
-                .kimi
-                .eval_json(
-                    r#"
+        // ── Fallback: DOM sweep (bounded by virtual-list window) ──
+        //
+        // DeepSeek's virtual-list keeps a bounded render window (~13-33 items).
+        // Scrolling unmounts items that leave the viewport. So a single read only
+        // captures the current window. To capture the ENTIRE conversation we sweep
+        // top→bottom, reading at each position and accumulating by key (dedup).
+        //
+        // The sweep terminates when the accumulated key-set stops growing for
+        // several consecutive steps. scrollTop is NOT a reliable terminator —
+        // DeepSeek clamps it to a minimum and adjusts it asynchronously.
+        //
+        // Read the current virtual-list window — returns JSON array with `key`.
+        let read_items_js = r#"
 (() => {
-    const msgs = document.querySelectorAll('.ds-message');
-    return JSON.stringify(Array.from(msgs).map(msg => {
+    const vl = document.querySelector('.ds-virtual-list');
+    if (!vl) return JSON.stringify([]);
+    const items = vl.querySelectorAll('[data-virtual-list-item-key]');
+    return JSON.stringify(Array.from(items).map(item => {
+        const key = item.getAttribute('data-virtual-list-item-key');
+        const msg = item.querySelector('.ds-message');
+        if (!msg) return { key, role: 'unknown', content: '', think: '', think_secs: '' };
         const classes = (msg.className || '').split(/\s+/).filter(Boolean);
         const hasHash = classes.some(c => /^d[0-9a-f]{7,}$/i.test(c));
         if (hasHash) {
-            // User message
-            const bubble = msg.querySelector('[class*="fbb737a4"]');
             return {
+                key,
                 role: 'user',
-                content: ((bubble || msg).textContent || '').trim().substring(0, 20000),
-                think: '',
-                think_secs: ''
+                content: ((msg.querySelector('[class*="fbb737a4"]') || msg).textContent || '').trim().substring(0, 20000),
+                think: '', think_secs: ''
             };
         } else {
-            // Assistant message
             const main = msg.querySelector('.ds-markdown.ds-assistant-message-main-content');
             let content = main ? main.textContent.trim() : '';
             if (!content) {
@@ -641,41 +655,102 @@ impl DeepSeekSemantics {
                     .join('\n').trim();
             }
             const thinkEl = msg.querySelector('.ds-think-content');
-            let think = '';
-            let thinkSecs = '';
+            let think = '', thinkSecs = '';
             if (thinkEl) {
                 think = Array.from(thinkEl.querySelectorAll('.ds-markdown'))
-                    .map(md => md.textContent.trim())
-                    .join('\n');
-                const fullText = msg.textContent || '';
-                const tm = fullText.match(/已思考[（(]用时\s*(\d+)\s*秒[）)]/);
+                    .map(md => md.textContent.trim()).join('\n');
+                const tm = (msg.textContent || '').match(/已思考[（(]用时\s*(\d+)\s*秒[）)]/);
                 if (tm) thinkSecs = tm[1];
             }
-            return {
-                role: 'assistant',
-                content: content.substring(0, 20000),
-                think: think.substring(0, 20000),
-                think_secs: thinkSecs
-            };
+            return { key, role: 'assistant', content: content.substring(0,20000), think: think.substring(0,20000), think_secs: thinkSecs };
         }
     }));
 })()
-"#,
-                )
-                .await;
+"#;
 
-            let current = match &data {
-                Some(v) => v.as_array().map(|a| a.clone()).unwrap_or_default(),
-                None => vec![],
-            };
+        // Scroll down by a SMALL step. A full viewport-height jump can skip past
+        // items the virtual list hasn't mounted yet (it needs a scroll event + a
+        // render cycle to mount the next batch). ~30% of viewport keeps us inside
+        // the CDK's buffer. Returns new scrollTop for stall detection.
+        let scroll_down_js = r#"
+(() => {
+    const vl = document.querySelector('.ds-virtual-list');
+    if (!vl) return '0,0,0';
+    const step = Math.max(150, Math.floor(vl.clientHeight * 0.3));
+    vl.scrollTop = Math.min(vl.scrollTop + step, vl.scrollHeight);
+    vl.dispatchEvent(new Event('scroll', {bubbles: true}));
+    return Math.round(vl.scrollTop) + ',' + Math.round(vl.scrollHeight) + ',' + Math.round(vl.clientHeight);
+})()
+"#;
 
-            if current.len() == prev_count && !current.is_empty() {
-                raw_msgs = current;
-                break;
+        // Scroll to top first (DeepSeek may clamp, but we try).
+        self.kimi
+            .eval_js(
+                r#"(() => { const vl=document.querySelector('.ds-virtual-list'); if(vl) { vl.scrollTop=0; vl.dispatchEvent(new Event('scroll',{bubbles:true})); } return ''; })()"#,
+            )
+            .await;
+        tokio::time::sleep(Duration::from_millis(400)).await;
+
+        let mut accumulated: BTreeMap<u64, serde_json::Value> = BTreeMap::new();
+        let mut last_scroll_top: i64 = -1;
+        let mut stuck_count = 0u32; // consecutive steps with no new keys
+        let mut stall_count = 0u32; // consecutive steps where scrollTop didn't move
+
+        for _step in 0..500 {
+            let data = self.kimi.eval_json(read_items_js).await;
+            let prev_len = accumulated.len();
+            if let Some(arr) = data.and_then(|v| v.as_array().map(|a| a.clone())) {
+                for item in arr {
+                    if let Some(key_str) = item.get("key").and_then(|k| k.as_str()) {
+                        if let Ok(key) = key_str.parse::<u64>() {
+                            accumulated.entry(key).or_insert(item);
+                        }
+                    }
+                }
             }
-            prev_count = current.len();
-            raw_msgs = current;
+
+            // Termination: no new keys discovered for several steps → swept past end.
+            if accumulated.len() == prev_len {
+                if !accumulated.is_empty() {
+                    stuck_count += 1;
+                    if stuck_count >= 8 {
+                        break;
+                    }
+                }
+            } else {
+                stuck_count = 0;
+            }
+
+            // Scroll down by a small step.
+            let (scroll_info, _) = self.kimi.eval_js(scroll_down_js).await;
+            let parts: Vec<&str> = scroll_info.split(',').collect();
+            let new_top: i64 = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+
+            // Detect a stuck scroll. Nudge back to top to re-trigger lazy loading.
+            if new_top == last_scroll_top {
+                stall_count += 1;
+                if stall_count >= 3 {
+                    break;
+                }
+                self.kimi
+                    .eval_js(
+                        r#"(() => { const vl=document.querySelector('.ds-virtual-list'); if(vl) { vl.scrollTop=0; vl.dispatchEvent(new Event('scroll',{bubbles:true})); } return ''; })()"#,
+                    )
+                    .await;
+                tokio::time::sleep(Duration::from_millis(300)).await;
+            } else {
+                stall_count = 0;
+            }
+            last_scroll_top = new_top;
+            tokio::time::sleep(Duration::from_millis(30)).await;
         }
+
+        debug!(
+            total_keys = accumulated.len(),
+            "extract_turns sweep complete"
+        );
+
+        let raw_msgs: Vec<serde_json::Value> = accumulated.into_values().collect();
 
         // Pair consecutive user→assistant messages into ChatTurn
         let mut turns: Vec<ChatTurn> = Vec::new();
@@ -737,6 +812,116 @@ impl DeepSeekSemantics {
 
         debug!(turn_count = turns.len(), "extract_turns done");
         turns
+    }
+
+    /// Fetch the full conversation via DeepSeek's history API (fast path).
+    ///
+    /// Calls `GET /api/v0/chat/history_messages?chat_session_id=<id>` with the
+    /// `userToken` from localStorage. Returns the full message list in one shot —
+    /// no virtual-list truncation. Returns `None` if the API is unavailable (no
+    /// session id in URL, not logged in, or request fails).
+    async fn extract_turns_via_api(&self) -> Option<Vec<ChatTurn>> {
+        let data = self
+            .kimi
+            .eval_json(
+                r#"(async () => {
+            // Extract session id from URL: /a/chat/s/<uuid>
+            const m = window.location.pathname.match(/\/a\/chat\/s\/([0-9a-f-]+)/i);
+            if (!m) return null;
+            const sessionId = m[1];
+
+            // Read auth token from localStorage
+            const rawToken = localStorage.getItem('userToken');
+            if (!rawToken) return null;
+            let token;
+            try { token = JSON.parse(rawToken).value; } catch(e) { return null; }
+            if (!token) return null;
+
+            try {
+                const r = await fetch('/api/v0/chat/history_messages?chat_session_id=' + sessionId, {
+                    credentials: 'include',
+                    headers: { 'Authorization': token }
+                });
+                if (!r.ok) return null;
+                const parsed = await r.json();
+                if (parsed.code !== 0 || !parsed.data || !parsed.data.biz_data) return null;
+                const msgs = parsed.data.biz_data.chat_messages || [];
+                // Return a compact array — only the fields we need for pairing.
+                return JSON.stringify(msgs.map(m => ({
+                    role: (m.role || '').toUpperCase() === 'USER' ? 'user' : 'assistant',
+                    content: (m.content || '').substring(0, 20000),
+                    think: (m.thinking_content || '').substring(0, 20000),
+                    think_secs: String(m.thinking_elapsed_secs || '')
+                })));
+            } catch(e) {
+                return null;
+            }
+        })()"#,
+            )
+            .await;
+
+        let arr = data?;
+        let msgs = arr.as_array()?;
+        if msgs.is_empty() {
+            return None;
+        }
+
+        // Pair consecutive user→assistant (same logic as the DOM fallback).
+        let mut turns: Vec<ChatTurn> = Vec::new();
+        let mut i = 0;
+        while i < msgs.len() {
+            let role = msgs[i].get("role").and_then(|v| v.as_str()).unwrap_or("");
+            let content = msgs[i]
+                .get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            if role == "user" {
+                if i + 1 < msgs.len() {
+                    let next_role = msgs[i + 1]
+                        .get("role")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if next_role == "assistant" {
+                        let resp = msgs[i + 1]
+                            .get("content")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        turns.push(ChatTurn {
+                            user_message: content,
+                            assistant_response: resp,
+                            thinking_trace: extract_thinking_trace(&msgs[i + 1]),
+                            timestamp: 0.0,
+                        });
+                        i += 2;
+                        continue;
+                    }
+                }
+                turns.push(ChatTurn {
+                    user_message: content,
+                    assistant_response: String::new(),
+                    thinking_trace: None,
+                    timestamp: 0.0,
+                });
+                i += 1;
+            } else {
+                turns.push(ChatTurn {
+                    user_message: String::new(),
+                    assistant_response: content,
+                    thinking_trace: extract_thinking_trace(&msgs[i]),
+                    timestamp: 0.0,
+                });
+                i += 1;
+            }
+        }
+        debug!(
+            turn_count = turns.len(),
+            source = "api",
+            "extract_turns via API"
+        );
+        Some(turns)
     }
 
     // ── Session navigation ──

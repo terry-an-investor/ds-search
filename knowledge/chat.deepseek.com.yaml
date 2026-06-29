@@ -69,6 +69,31 @@ history:
   match: case-insensitive includes on textContent
   note: "Clicking a sidebar link navigates within the SPA; navigate(full URL) also works but may need extra hydration time for the virtual list."
 
+# ── History API (verified live 2026-06-29) ──
+# The authoritative way to extract a FULL conversation — bypasses the
+# virtual list entirely. The virtual list only renders ~13-33 messages at a
+# time (Angular CDK bounded window), so DOM scraping cannot reliably capture
+# long conversations. The API returns ALL messages in one shot.
+history_api:
+  endpoint: 'GET /api/v0/chat/history_messages?chat_session_id=<uuid>'
+  auth_header: 'Authorization: <userToken>'  # raw token value, NOT "Bearer ..."
+  token_source: 'localStorage["userToken"]'   # JSON: {"value":"<token>","__version":"0"}
+  response_shape: >
+    {code:0, data:{biz_data:{chat_session:{title,...}, chat_messages:[...]}}}
+  message_fields:
+    role: "USER | ASSISTANT"
+    content: "message text (markdown)"
+    thinking_content: "reasoning trace (when thinking enabled)"
+    thinking_elapsed_secs: "seconds spent thinking"
+    message_id: "stable id"
+    inserted_at: "timestamp"
+  note: >
+    This is called from within the page (the browser's fetch carries the login
+    cookie/credentials). KimiWebBridge's evaluate channel executes JS on the
+    already-loaded page, so it has the session. Monkey-patching window.fetch to
+    INTERCEPT requests does NOT work (DeepSeek captures the fetch reference at
+    page-load time, before our patch), but INITIATING a new fetch works fine.
+
 # ── Loading indicators ──
 loading:
   - .ds-loading

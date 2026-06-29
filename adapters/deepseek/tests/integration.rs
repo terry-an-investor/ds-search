@@ -230,12 +230,17 @@ async fn fast_state_default() {
 async fn extract_turns_pairs_user_assistant() {
     let m = MockKimi::new().await;
     let raw = serde_json::json!([
-        {"role": "user", "content": "hello", "think": "", "think_secs": ""},
-        {"role": "assistant", "content": "hi there", "think": "", "think_secs": ""},
-        {"role": "user", "content": "bye", "think": "", "think_secs": ""},
-        {"role": "assistant", "content": "goodbye", "think": "", "think_secs": ""}
+        {"key":"1","role": "user", "content": "hello", "think": "", "think_secs": ""},
+        {"key":"2","role": "assistant", "content": "hi there", "think": "", "think_secs": ""},
+        {"key":"3","role": "user", "content": "bye", "think": "", "think_secs": ""},
+        {"key":"4","role": "assistant", "content": "goodbye", "think": "", "think_secs": ""}
     ]);
-    m.set_eval_response("JSON.stringify", serde_json::json!(raw.to_string()));
+    m.set_eval_response(
+        "data-virtual-list-item-key",
+        serde_json::json!(raw.to_string()),
+    );
+    // scroll-down returns "0,0,0" → loop breaks after one read (all items in one window).
+    m.set_eval_response("scrollTop", serde_json::json!("0,0,0"));
     let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let turns = s.extract_turns().await;
     assert_eq!(turns.len(), 2);
@@ -251,8 +256,10 @@ async fn extract_turns_pairs_user_assistant() {
 #[tokio::test]
 async fn extract_turns_empty_when_no_messages() {
     let m = MockKimi::new().await;
-    // Explicitly mock an empty array — no .ds-message elements found.
-    m.set_eval_response("JSON.stringify", serde_json::json!("[]"));
+    // read_items JS returns an empty array; scroll-down returns "0,0,0" so the
+    // sweep loop breaks after one step (scrollTop doesn't change).
+    m.set_eval_response("data-virtual-list-item-key", serde_json::json!("[]"));
+    m.set_eval_response("scrollTop", serde_json::json!("0,0,0"));
     let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let turns = s.extract_turns().await;
     assert!(turns.is_empty());
@@ -262,10 +269,15 @@ async fn extract_turns_empty_when_no_messages() {
 async fn extract_turns_handles_thinking_trace() {
     let m = MockKimi::new().await;
     let raw = serde_json::json!([
-        {"role": "user", "content": "hello", "think": "", "think_secs": ""},
-        {"role": "assistant", "content": "some answer", "think": "reasoning here", "think_secs": "6"}
+        {"key":"1","role": "user", "content": "hello", "think": "", "think_secs": ""},
+        {"key":"2","role": "assistant", "content": "some answer", "think": "reasoning here", "think_secs": "6"}
     ]);
-    m.set_eval_response("JSON.stringify", serde_json::json!(raw.to_string()));
+    m.set_eval_response(
+        "data-virtual-list-item-key",
+        serde_json::json!(raw.to_string()),
+    );
+    // scroll-down returns "0,0,0" → loop breaks after one read (all items in one window).
+    m.set_eval_response("scrollTop", serde_json::json!("0,0,0"));
     let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let turns = s.extract_turns().await;
     assert_eq!(turns.len(), 1);
@@ -281,9 +293,13 @@ async fn extract_turns_orphan_assistant() {
     let m = MockKimi::new().await;
     // First message is assistant (no preceding user) — defensive edge case.
     let raw = serde_json::json!([
-        {"role": "assistant", "content": "orphan response", "think": "", "think_secs": ""}
+        {"key":"1","role": "assistant", "content": "orphan response", "think": "", "think_secs": ""}
     ]);
-    m.set_eval_response("JSON.stringify", serde_json::json!(raw.to_string()));
+    m.set_eval_response(
+        "data-virtual-list-item-key",
+        serde_json::json!(raw.to_string()),
+    );
+    m.set_eval_response("scrollTop", serde_json::json!("0,0,0"));
     let s = DeepSeekSemantics::new(KimiPrimitives::new(m.server.uri(), "t"));
     let turns = s.extract_turns().await;
     assert_eq!(turns.len(), 1);
